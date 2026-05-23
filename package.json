@@ -1,0 +1,17 @@
+{
+  "name": "revogue",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Revogue — runs the backend API and the React frontend together",
+  "scripts": {
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix revogue-app",
+    "dev": "concurrently --kill-others-on-fail --names \"api,web\" --prefix-colors \"magenta,cyan\" \"npm run dev --prefix backend\" \"npm run dev --prefix revogue-app\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix revogue-app",
+    "seed": "npm run seed --prefix backend",
+    "start": "npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
