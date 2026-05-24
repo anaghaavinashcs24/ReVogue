@@ -86,6 +86,27 @@ router.post('/', protect, async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
+// PATCH /api/posts/:id  — owner only
+router.patch('/:id', protect, async (req, res, next) => {
+  try {
+    const post = await Post.findById(req.params.id);
+    if (!post) {
+      res.status(404);
+      throw new Error('Post not found');
+    }
+    if (String(post.user) !== String(req.user._id)) {
+      res.status(403);
+      throw new Error('You can only edit your own posts');
+    }
+    const allowed = ['caption', 'image', 'fallbackImage', 'tags', 'products'];
+    for (const key of allowed) {
+      if (req.body[key] !== undefined) post[key] = req.body[key];
+    }
+    await post.save();
+    res.json(post);
+  } catch (err) { next(err); }
+});
+
 // POST /api/posts/:id/like
 router.post('/:id/like', protect, async (req, res, next) => {
   try {

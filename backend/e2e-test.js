@@ -241,6 +241,15 @@ async function req(method, path, { body, token, isForm } = {}) {
   const newPostId = r.data._id;
   log('POST /api/posts (create)', r.ok && r.data.caption === 'QA test post');
 
+  r = await req('PATCH', `/api/posts/${newPostId}`, {
+    token: qaToken,
+    body: { caption: 'QA edited caption', image: 'https://example.com/new.jpg' },
+  });
+  log('PATCH /api/posts/:id (own)', r.ok && r.data.caption === 'QA edited caption' && r.data.image === 'https://example.com/new.jpg');
+
+  r = await req('PATCH', `/api/posts/${newPostId}`, { token, body: { caption: 'hijack' } });
+  log('PATCH /api/posts/:id (someone else → 403)', r.status === 403);
+
   r = await req('DELETE', `/api/posts/${newPostId}`, { token: qaToken });
   log('DELETE /api/posts/:id (own)', r.ok);
 

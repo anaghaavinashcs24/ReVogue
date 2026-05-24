@@ -216,7 +216,7 @@ const STYLE_POSTS = [
   { id: 3, user: "vintage_vault", avatar: "🍂", caption: "Old money energy with this cream quarter-zip. Thrifted, timeless, tenderly loved", img: "https://images.unsplash.com/photo-1529139574466-a303027c1d8b?w=800&q=80", fallbackImg: outfitImg("cream"), likes: 1567, comments: 94, tags: ["#oldmoney", "#quietluxury"], products: [2] },
   { id: 4, user: "grunge_gallery", avatar: "⚡", caption: "Oversized flannel + chunky chain = the uniform. Thrifting > fast fashion always", img: "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800&q=80", fallbackImg: outfitImg("brown"), likes: 987, comments: 62, tags: ["#grunge", "#sustainable"], products: [8, 11] },
   { id: 5, user: "noir_closet", avatar: "🖤", caption: "Leather jacket + platform boots. Pre-loved pieces, post-punk mood", img: "https://images.unsplash.com/photo-1496747611176-843222e1e57c?w=800&q=80", fallbackImg: outfitImg("ink"), likes: 2134, comments: 112, tags: ["#grunge", "#vintage"], products: [14, 19] },
-  { id: 6, user: "soiree_seconds", avatar: "✨", caption: "Slip dress season. Found this gem for ₹899 and I'm obsessed", img: "https://images.unsplash.com/photo-1539109136881-3be0616acf4b?w=800&q=80", fallbackImg: outfitImg("plum"), likes: 1789, comments: 98, tags: ["#y2k", "#luxe"], products: [21] },
+  { id: 6, user: "soiree_seconds", avatar: "✨", caption: "Slip dress season. Found this gem for ₹899 and I'm obsessed", img: " https://images.squarespace-cdn.com/content/v1/52fd631be4b04956087905ff/1481550321800-63E61O4T2OMWG72EG6VX/image-asset.jpeg", fallbackImg: outfitImg("plum"), likes: 1789, comments: 98, tags: ["#y2k", "#luxe"], products: [21] },
 ];
 
 const VIBES = [
@@ -286,11 +286,17 @@ export default function Revogue() {
   const [postComments, setPostComments] = useState({}); // { postId: [{ user, text, time }] }
   const [openComments, setOpenComments] = useState(null); // postId
   const [commentDraft, setCommentDraft] = useState('');
+  // Search tab has its own query so Home's chips (gender/vibe/category) + search bar
+  // don't leak into Search. The Search tab uses ONLY this query and ignores Home's filters.
+  const [searchTabQuery, setSearchTabQuery] = useState('');
   // ----- Backend-sourced state -----
   const [remoteProducts, setRemoteProducts] = useState([]);
   const [remotePosts, setRemotePosts] = useState([]);
   const [sustainStats, setSustainStats] = useState(null);
   const [bootError, setBootError] = useState('');
+  // Edit-in-place: when set, renderSell pre-fills + becomes Update; renderPostStyle does the same
+  const [editingListingId, setEditingListingId] = useState(null);
+  const [editingPostId, setEditingPostId] = useState(null);
 
   // ---- Toast helper ----
   const pushToast = (msg, kind = 'info') => {
@@ -587,21 +593,64 @@ export default function Revogue() {
   // Use remote posts when available, otherwise fall back to seed data shipped in this file
   const visiblePosts = remotePosts.length ? remotePosts : STYLE_POSTS;
 
+  // Search helper: does a product mention this token in any of its searchable fields?
+  // Used to make multi-word search work (e.g. "Y2K tops" matches Y2K-tagged products in Tops category)
+  const fieldsInclude = (p, tok) => {
+    if (!tok) return true;
+    return (
+      (p.title || '').toLowerCase().includes(tok) ||
+      (p.brand || '').toLowerCase().includes(tok) ||
+      (p.category || '').toLowerCase().includes(tok) ||
+      (p.gender || '').toLowerCase().includes(tok) ||
+      (p.condition || '').toLowerCase().includes(tok) ||
+      (p.tags || []).some(t => (t || '').toLowerCase().includes(tok))
+    );
+  };
+
   const filteredProducts = useMemo(() => {
     return allProducts.filter(p => {
       if (selectedGender !== 'All' && p.gender !== selectedGender && p.gender !== 'Unisex') return false;
       if (selectedVibe && !p.tags.includes(selectedVibe)) return false;
       if (selectedCategory && p.category !== selectedCategory) return false;
       if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        return p.title.toLowerCase().includes(q) ||
-               p.brand.toLowerCase().includes(q) ||
-               p.category.toLowerCase().includes(q) ||
-               p.tags.some(t => t.toLowerCase().includes(q));
+        const raw = searchQuery.toLowerCase().trim();
+        // Detect "under ₹500" / "under 500" / "below 1000" as a price filter
+        const priceMatch = raw.match(/(?:under|below|less than|<)\s*[₹$]?\s*(\d+)/);
+        if (priceMatch) {
+          if (p.price > Number(priceMatch[1])) return false;
+          // After applying the price filter, drop the price phrase and treat the rest as keywords
+          const rest = raw.replace(priceMatch[0], '').trim();
+          if (!rest) return true;
+          const tokens = rest.split(/\s+/).filter(Boolean);
+          return tokens.every(tok => fieldsInclude(p, tok));
+        }
+        // Multi-word search: every token must appear in at least one field
+        // (so "Y2K tops" matches Y2K-tagged products in the Tops category, not just literal "y2k tops" in title)
+        const tokens = raw.split(/\s+/).filter(Boolean);
+        return tokens.every(tok => fieldsInclude(p, tok));
       }
       return true;
     });
   }, [searchQuery, selectedGender, selectedVibe, selectedCategory, allProducts]);
+
+  // Search tab uses ONLY searchTabQuery — no gender/vibe/category filters apply here.
+  // This keeps the Search page independent of any filters the user set on Home.
+  const searchTabProducts = useMemo(() => {
+    if (!searchTabQuery) return allProducts;
+    const raw = searchTabQuery.toLowerCase().trim();
+    const priceMatch = raw.match(/(?:under|below|less than|<)\s*[₹$]?\s*(\d+)/);
+    return allProducts.filter(p => {
+      if (priceMatch) {
+        if (p.price > Number(priceMatch[1])) return false;
+        const rest = raw.replace(priceMatch[0], '').trim();
+        if (!rest) return true;
+        const tokens = rest.split(/\s+/).filter(Boolean);
+        return tokens.every(tok => fieldsInclude(p, tok));
+      }
+      const tokens = raw.split(/\s+/).filter(Boolean);
+      return tokens.every(tok => fieldsInclude(p, tok));
+    });
+  }, [searchTabQuery, allProducts]);
 
   // ============ STYLES ============
   const styles = `
@@ -1127,35 +1176,35 @@ export default function Revogue() {
       <div className="rv-search-wrap">
         <div className="rv-search">
           <Search size={16} color="var(--ink-soft)" strokeWidth={1.8} />
-          <input placeholder="Brand, vibe, or piece…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} autoFocus />
-          {searchQuery && <button onClick={() => setSearchQuery('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',display:'flex'}}><X size={14}/></button>}
+          <input placeholder="Brand, vibe, or piece…" value={searchTabQuery} onChange={e => setSearchTabQuery(e.target.value)} autoFocus />
+          {searchTabQuery && <button onClick={() => setSearchTabQuery('')} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',display:'flex'}}><X size={14}/></button>}
         </div>
       </div>
 
-      {!searchQuery && (
+      {!searchTabQuery && (
         <div className="rv-section">
           <div className="rv-label">Trending searches</div>
           <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:10}}>
-            {['Levi\'s denim','Cottagecore dresses','Old Money','Y2K tops','Under ₹500','Cream sweater','Leather boots'].map(q => (
-              <button key={q} onClick={() => setSearchQuery(q)} style={{padding:'8px 14px',borderRadius:20,border:'1px solid #d6cab4',background:'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>{q}</button>
+            {['Cottagecore dresses','Old Money','Under ₹500','Cream sweater'].map(q => (
+              <button key={q} onClick={() => setSearchTabQuery(q)} style={{padding:'8px 14px',borderRadius:20,border:'1px solid #d6cab4',background:'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>{q}</button>
             ))}
           </div>
         </div>
       )}
 
       <div className="rv-section" style={{paddingBottom:8}}>
-        <div className="rv-section-title rv-serif">{searchQuery ? `${filteredProducts.length} finds` : <>Popular <em>right now</em></>}</div>
+        <div className="rv-section-title rv-serif">{searchTabQuery ? `${searchTabProducts.length} finds` : <>Popular <em>right now</em></>}</div>
       </div>
 
-      {filteredProducts.length === 0 ? (
+      {searchTabProducts.length === 0 ? (
         <div className="rv-empty">
           <div className="rv-empty-icon">🔍</div>
           <div className="rv-empty-title rv-serif">Nothing found</div>
-          <div className="rv-empty-text">Try fewer words or a different vibe.</div>
+          <div className="rv-empty-text">Try fewer words or a different search.</div>
         </div>
       ) : (
         <div className="rv-grid">
-          {filteredProducts.map((p, i) => (
+          {searchTabProducts.map((p, i) => (
             <div key={p.id} className="rv-card" style={{animationDelay:`${i*0.04}s`}} onClick={() => { setSelectedProduct(p); setScreen('detail'); }}>
               <div className="rv-card-img">
                 <img src={p.img} alt={p.title} className="rv-card-photo" loading="lazy" onError={(e) => handleImgError(e, p)} />
@@ -1180,35 +1229,91 @@ export default function Revogue() {
   );
 
   const renderStyleFeed = () => {
-    const toggleLike = async (postId, currentLikes) => {
-      const wasLiked = postLikes[postId];
-      setPostLikes(prev => ({ ...prev, [postId]: !wasLiked }));
+    // ----- Like / Save / Comment plumbing -----
+    // Source of truth for backend posts is remotePosts[i] itself (likes, likedByMe, savedByMe, comments).
+    // postLikes/postSaves local overlays only matter for offline fallback STYLE_POSTS (numeric IDs).
+    const toggleLike = async (postId) => {
+      const isBackendPost = typeof postId === 'string';
+      if (!isBackendPost) {
+        // Local fallback post (numeric ID)
+        const wasLiked = !!postLikes[postId];
+        setPostLikes(prev => ({ ...prev, [postId]: !wasLiked }));
+        pushToast(wasLiked ? 'Unliked' : '♡ Liked', wasLiked ? 'info' : 'success');
+        return;
+      }
+      const post = remotePosts.find(p => p.id === postId);
+      if (!post) return;
+      const wasLiked = !!post.likedByMe;
+      // Optimistic: update count + flag
+      setRemotePosts(prev => prev.map(p => p.id === postId ? {
+        ...p,
+        likes: Math.max(0, (p.likes || 0) + (wasLiked ? -1 : 1)),
+        likedByMe: !wasLiked,
+      } : p));
       pushToast(wasLiked ? 'Unliked' : '♡ Liked', wasLiked ? 'info' : 'success');
-      if (!getToken() || typeof postId !== 'string') return;
-      try { await api.likePost(postId); }
-      catch { setPostLikes(prev => ({ ...prev, [postId]: wasLiked })); }
-    };
-    const toggleSave = async (postId) => {
-      const wasSaved = postSaves[postId];
-      setPostSaves(prev => ({ ...prev, [postId]: !wasSaved }));
-      pushToast(wasSaved ? 'Removed from saved' : '🔖 Saved to your collection', wasSaved ? 'info' : 'success');
-      if (!getToken() || typeof postId !== 'string') return;
-      try { await api.savePost(postId); }
-      catch { setPostSaves(prev => ({ ...prev, [postId]: wasSaved })); }
-    };
-    const sharePost = (post) => {
-      const url = `https://revogue.app/look/${post.id}`;
-      if (navigator.clipboard?.writeText) {
-        navigator.clipboard.writeText(url).then(
-          () => pushToast('🔗 Link copied to clipboard', 'success'),
-          () => pushToast('🔗 Link ready to share', 'info')
-        );
-      } else {
-        pushToast('🔗 Link ready to share', 'info');
+      if (!getToken()) return;
+      try {
+        const r = await api.likePost(postId);
+        // Replace optimistic state with server truth
+        setRemotePosts(prev => prev.map(p => p.id === postId ? { ...p, likes: r.likes, likedByMe: r.liked } : p));
+      } catch (e) {
+        // Rollback
+        setRemotePosts(prev => prev.map(p => p.id === postId ? {
+          ...p,
+          likes: Math.max(0, (p.likes || 0) + (wasLiked ? 1 : -1)),
+          likedByMe: wasLiked,
+        } : p));
+        pushToast(e.message || 'Like failed', 'info');
       }
     };
-    const getCount = (postId, base) => base + (postLikes[postId] ? 1 : 0);
-    const getCommentCount = (postId, base) => base + (postComments[postId]?.length || 0);
+    const toggleSave = async (postId) => {
+      const isBackendPost = typeof postId === 'string';
+      if (!isBackendPost) {
+        const wasSaved = !!postSaves[postId];
+        setPostSaves(prev => ({ ...prev, [postId]: !wasSaved }));
+        pushToast(wasSaved ? 'Removed from saved' : '🔖 Saved to your collection', wasSaved ? 'info' : 'success');
+        return;
+      }
+      const post = remotePosts.find(p => p.id === postId);
+      if (!post) return;
+      const wasSaved = !!post.savedByMe;
+      setRemotePosts(prev => prev.map(p => p.id === postId ? { ...p, savedByMe: !wasSaved } : p));
+      pushToast(wasSaved ? 'Removed from saved' : '🔖 Saved to your collection', wasSaved ? 'info' : 'success');
+      if (!getToken()) return;
+      try { await api.savePost(postId); }
+      catch (e) {
+        setRemotePosts(prev => prev.map(p => p.id === postId ? { ...p, savedByMe: wasSaved } : p));
+        pushToast(e.message || 'Save failed', 'info');
+      }
+    };
+    const sharePost = async (post) => {
+      const url = `${window.location.origin}/?look=${post.id}`;
+      const text = `Check out this look on Revogue ✨\n"${post.caption || ''}"\n@${post.user} · ${url}`;
+      // On mobile, use the native share sheet (lets user pick WhatsApp, Insta DM, anything)
+      if (navigator.share) {
+        try { await navigator.share({ title: 'Revogue Lookbook', text, url }); return; }
+        catch { /* user cancelled */ return; }
+      }
+      // Desktop fallback: open WhatsApp Web directly
+      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+    };
+    // Like count: for backend posts the source of truth is post.likes (we update it optimistically).
+    // For fallback STYLE_POSTS (numeric IDs), apply the local overlay on top.
+    const getCount = (post) => {
+      const isBackend = typeof post.id === 'string';
+      const baseLikes = Number(post.likes) || 0;
+      if (isBackend) return baseLikes;
+      return baseLikes + (postLikes[post.id] ? 1 : 0);
+    };
+    // Comment count: post.comments is always an array now. Add any locally-added comments not yet flushed to backend.
+    const getCommentCount = (post) => {
+      const serverCount = Array.isArray(post.comments) ? post.comments.length : (Number(post.comments) || 0);
+      const localExtra = postComments[post.id]?.length || 0;
+      const isBackend = typeof post.id === 'string';
+      // For backend posts, locally-added comments are already merged into post.comments by submitComment,
+      // so don't double-count them.
+      return isBackend ? serverCount : (serverCount + localExtra);
+    };
 
     return (
       <>
@@ -1221,29 +1326,65 @@ export default function Revogue() {
         {visiblePosts.map((post, i) => {
           const liked = postLikes[post.id] !== undefined ? !!postLikes[post.id] : !!post.likedByMe;
           const saved = postSaves[post.id] !== undefined ? !!postSaves[post.id] : !!post.savedByMe;
+          // A post is "mine" if its username matches my username — works for both backend posts and edited ones
+          const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+          const isMyPost = !!getToken() && (post.user === myHandle || post.user === userName?.toLowerCase());
           return (
             <div key={post.id} className="rv-post" style={{animation:`rvSlideUp 0.5s ease ${i*0.1}s backwards`}}>
               <div className="rv-post-head">
                 <div className="rv-post-avatar">{post.avatar}</div>
                 <div style={{flex:1}}>
-                  <div className="rv-post-user">@{post.user}</div>
-                  <div className="rv-post-time">2h ago · {post.tags[0]}</div>
+                  <div className="rv-post-user">@{post.user}{isMyPost && <span style={{marginLeft:6,padding:'1px 6px',background:'var(--sage)',color:'white',borderRadius:6,fontSize:8,fontWeight:600,letterSpacing:0.5}}>YOU</span>}</div>
+                  <div className="rv-post-time">{post.createdAt ? new Date(post.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short' }) : '2h ago'} · {post.tags[0] || ''}</div>
                 </div>
+                {isMyPost && (
+                  <>
+                    <button onClick={() => {
+                      // Open edit screen pre-filled with this post's data
+                      setListingDraft({
+                        ...emptyListing,
+                        description: post.caption || '',
+                        tags: post.tags || [],
+                        postImg: post.img,
+                        postFile: null,  // no new file picked yet
+                        taggedProducts: post.products || [],
+                      });
+                      setEditingPostId(post.id);
+                      setScreen('post-style');
+                    }} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',padding:4}}>
+                      <Edit3 size={16} strokeWidth={1.8}/>
+                    </button>
+                    <button onClick={async () => {
+                      if (!confirm('Delete this post?')) return;
+                      const prevPosts = remotePosts;
+                      setRemotePosts(prev => prev.filter(p => p.id !== post.id));
+                      try {
+                        await api.deletePost(post.id);
+                        pushToast('Post deleted', 'success');
+                      } catch (e) {
+                        setRemotePosts(prevPosts);
+                        pushToast(e.message || 'Could not delete', 'info');
+                      }
+                    }} style={{background:'none',border:'none',cursor:'pointer',color:'#c94848',padding:4}}>
+                      <Trash2 size={16} strokeWidth={1.8}/>
+                    </button>
+                  </>
+                )}
                 <button onClick={() => toggleSave(post.id)} style={{background:'none',border:'none',cursor:'pointer',color: saved ? 'var(--terracotta)' : 'var(--ink)',padding:4,transition:'color 0.2s'}}>
                   <Bookmark size={18} strokeWidth={1.8} fill={saved ? 'var(--terracotta)' : 'none'}/>
                 </button>
               </div>
-              <div className="rv-post-img" onDoubleClick={() => { if (!liked) toggleLike(post.id, post.likes); }}>
+              <div className="rv-post-img" onDoubleClick={() => { if (!liked) toggleLike(post.id); }}>
                 <img src={post.img} alt="outfit" loading="lazy" onError={(e) => { if (e.currentTarget.src !== post.fallbackImg && post.fallbackImg) e.currentTarget.src = post.fallbackImg; }}/>
               </div>
               <div className="rv-post-actions">
-                <button className={`rv-post-action ${liked ? 'rv-post-action-liked' : ''}`} onClick={() => toggleLike(post.id, post.likes)}>
+                <button className={`rv-post-action ${liked ? 'rv-post-action-liked' : ''}`} onClick={() => toggleLike(post.id)}>
                   <Heart size={18} strokeWidth={1.8} fill={liked ? 'var(--terracotta)' : 'none'} color={liked ? 'var(--terracotta)' : 'currentColor'}/>
-                  <span>{getCount(post.id, post.likes).toLocaleString()}</span>
+                  <span>{getCount(post).toLocaleString()}</span>
                 </button>
                 <button className="rv-post-action" onClick={() => { setOpenComments(post.id); setCommentDraft(''); }}>
                   <MessageCircle size={18} strokeWidth={1.8}/>
-                  <span>{getCommentCount(post.id, post.comments)}</span>
+                  <span>{getCommentCount(post)}</span>
                 </button>
                 <button className="rv-post-action" style={{marginLeft:'auto'}} onClick={() => sharePost(post)}>
                   <Share2 size={18} strokeWidth={1.8}/>
@@ -1278,27 +1419,56 @@ export default function Revogue() {
         {openComments !== null && (() => {
           const post = visiblePosts.find(p => p.id === openComments);
           if (!post) return null;
-          const localExtra = postComments[openComments] || [];
+          const isBackendPost = typeof openComments === 'string';
+          // Normalize all comments to {user, text, time} for display
           const serverComments = (post.comments || []).map(c => ({
             user: c.username || c.user || 'user',
             text: c.text,
             time: c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'now',
           }));
+          // For local-fallback (numeric-ID) posts we use postComments overlay; backend posts already merge into post.comments
+          const localExtra = isBackendPost ? [] : (postComments[openComments] || []);
           const allComments = [...serverComments, ...localExtra];
           const submitComment = async () => {
             if (!commentDraft.trim()) return;
-            const newComment = {
-              user: (userName || 'you').toLowerCase().replace(/\s/g, '_'),
-              text: commentDraft.trim(),
-              time: 'now',
-            };
-            setPostComments(prev => ({ ...prev, [openComments]: [...(prev[openComments] || []), newComment] }));
             const draft = commentDraft.trim();
+            const myHandle = (userName || 'you').toLowerCase().replace(/\s/g, '_');
             setCommentDraft('');
+            if (!isBackendPost) {
+              // Local-only post — keep tracking in postComments overlay
+              setPostComments(prev => ({
+                ...prev,
+                [openComments]: [...(prev[openComments] || []), { user: myHandle, text: draft, time: 'now' }],
+              }));
+              pushToast('💬 Comment posted', 'success');
+              return;
+            }
+            // Backend post: optimistically append to post.comments so the feed count updates immediately
+            const optimisticId = `tmp-${Date.now()}`;
+            const optimistic = {
+              _id: optimisticId,
+              username: myHandle,
+              avatar: '✨',
+              text: draft,
+              createdAt: new Date().toISOString(),
+            };
+            setRemotePosts(prev => prev.map(p => p.id === openComments
+              ? { ...p, comments: [...(p.comments || []), optimistic] }
+              : p));
             pushToast('💬 Comment posted', 'success');
-            if (getToken() && typeof openComments === 'string') {
-              try { await api.commentPost(openComments, draft); }
-              catch (e) { pushToast(e.message || 'Comment failed', 'info'); }
+            if (!getToken()) return;
+            try {
+              const saved = await api.commentPost(openComments, draft);
+              // Replace optimistic with server version
+              setRemotePosts(prev => prev.map(p => p.id === openComments
+                ? { ...p, comments: (p.comments || []).map(c => c._id === optimisticId ? saved : c) }
+                : p));
+            } catch (e) {
+              // Rollback
+              setRemotePosts(prev => prev.map(p => p.id === openComments
+                ? { ...p, comments: (p.comments || []).filter(c => c._id !== optimisticId) }
+                : p));
+              pushToast(e.message || 'Comment failed', 'info');
             }
           };
           return (
@@ -1671,22 +1841,65 @@ export default function Revogue() {
       ) : (
         <div className="rv-grid" style={{paddingTop:8}}>
           {userListings.map((p, i) => (
-            <div key={p.id} className="rv-card" style={{animationDelay:`${i*0.04}s`}} onClick={() => { setSelectedProduct(p); setScreen('detail'); }}>
-              <div className="rv-card-img">
+            <div key={p.id} className="rv-card" style={{animationDelay:`${i*0.04}s`}}>
+              <div className="rv-card-img" onClick={() => { setSelectedProduct(p); setScreen('detail'); }} style={{cursor:'pointer'}}>
                 <img src={p.img} alt={p.title} className="rv-card-photo" onError={(e) => handleImgError(e, p)} />
                 <span className="rv-card-cond">{p.condition}</span>
                 <span style={{position:'absolute',top:10,right:10,padding:'4px 10px',background:'var(--sage-deep)',color:'white',borderRadius:12,fontSize:9,fontWeight:600,letterSpacing:0.5,zIndex:2}}>LIVE</span>
               </div>
               <div className="rv-card-body">
-                <div className="rv-card-brand">{p.brand}</div>
-                <div className="rv-card-title rv-serif">{p.title}</div>
-                <div className="rv-card-price-row">
-                  <span className="rv-card-price rv-serif">₹{p.price}</span>
-                  <span className="rv-card-original">₹{p.originalPrice}</span>
+                <div onClick={() => { setSelectedProduct(p); setScreen('detail'); }} style={{cursor:'pointer'}}>
+                  <div className="rv-card-brand">{p.brand}</div>
+                  <div className="rv-card-title rv-serif">{p.title}</div>
+                  <div className="rv-card-price-row">
+                    <span className="rv-card-price rv-serif">₹{p.price}</span>
+                    <span className="rv-card-original">₹{p.originalPrice}</span>
+                  </div>
+                  <div style={{display:'flex',justifyContent:'space-between',marginTop:6,fontSize:10,color:'var(--ink-soft)'}}>
+                    <span>👁 {p.views || 0} views</span>
+                    <span>♡ {p.likes || 0}</span>
+                  </div>
                 </div>
-                <div style={{display:'flex',justifyContent:'space-between',marginTop:6,fontSize:10,color:'var(--ink-soft)'}}>
-                  <span>👁 {Math.floor(Math.random()*200+50)} views</span>
-                  <span>♡ {p.likes || 0}</span>
+                <div style={{display:'flex',gap:6,marginTop:10,paddingTop:10,borderTop:'1px solid #eae0cc'}}>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    // Pre-fill the Sell screen with this listing's data and switch to edit mode
+                    setListingDraft({
+                      title: p.title,
+                      brand: p.brand,
+                      price: String(p.price),
+                      originalPrice: String(p.originalPrice ?? p.price),
+                      category: p.category,
+                      condition: p.condition,
+                      size: p.size,
+                      gender: p.gender,
+                      description: p.description || '',
+                      tags: p.tags || [],
+                      imgs: p.imgs && p.imgs.length ? p.imgs : (p.img ? [p.img] : []),
+                    });
+                    setEditingListingId(p.id);
+                    setListingError('');
+                    setActiveTab('sell');
+                    setScreen('app');
+                  }} style={{flex:1,padding:'7px 10px',background:'var(--cream)',border:'1px solid #d6cab4',borderRadius:8,fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:4,color:'var(--ink)'}}><Edit3 size={11} strokeWidth={2}/> Edit</button>
+                  <button onClick={async (e) => {
+                    e.stopPropagation();
+                    if (!confirm(`Remove "${p.title}" from your listings?`)) return;
+                    const prevListings = userListings;
+                    setUserListings(prev => prev.filter(x => x.id !== p.id));
+                    setRemoteProducts(prev => prev.filter(x => x.id !== p.id));
+                    if (getToken() && typeof p.id === 'string') {
+                      try {
+                        await api.deleteProduct(p.id);
+                        pushToast('Listing removed', 'success');
+                      } catch (err) {
+                        setUserListings(prevListings);
+                        pushToast(err.message || 'Could not remove', 'info');
+                      }
+                    } else {
+                      pushToast('Listing removed', 'success');
+                    }
+                  }} style={{flex:1,padding:'7px 10px',background:'var(--paper)',border:'1px solid #d6cab4',borderRadius:8,fontSize:11,fontWeight:500,cursor:'pointer',fontFamily:'inherit',display:'flex',alignItems:'center',justifyContent:'center',gap:4,color:'#c94848'}}><Trash2 size={11} strokeWidth={2}/> Remove</button>
                 </div>
               </div>
             </div>
@@ -2115,18 +2328,23 @@ export default function Revogue() {
         tags: draft.tags.length ? draft.tags : ['New'],
         description: draft.description.trim(),
       };
+      const isEdit = !!editingListingId;
       if (!getToken()) {
-        // Offline fallback — keep the original local-only listing
-        setUserListings(prev => [{
-          ...payload,
-          id: Date.now(),
-          img: draft.imgs[0],
-          imgs: draft.imgs,
-          seller: (userName || 'me').toLowerCase().replace(/\s/g, '_'),
-          sellerRating: 5.0,
-          likes: 0,
-          isMine: true,
-        }, ...prev]);
+        if (isEdit) {
+          setUserListings(prev => prev.map(x => x.id === editingListingId ? { ...x, ...payload, img: draft.imgs[0], imgs: draft.imgs } : x));
+        } else {
+          // Offline fallback — keep the original local-only listing
+          setUserListings(prev => [{
+            ...payload,
+            id: Date.now(),
+            img: draft.imgs[0],
+            imgs: draft.imgs,
+            seller: (userName || 'me').toLowerCase().replace(/\s/g, '_'),
+            sellerRating: 5.0,
+            likes: 0,
+            isMine: true,
+          }, ...prev]);
+        }
       } else {
         // Refuse to publish if any photo is still uploading (data URL preview)
         const stillUploading = draft.imgs.some(u => typeof u === 'string' && u.startsWith('data:'));
@@ -2139,33 +2357,48 @@ export default function Revogue() {
           return;
         }
         try {
-          const created = await api.createProduct(payload);
-          setUserListings(prev => [{ ...normalizeProduct(created), isMine: true }, ...prev]);
-          // Also surface it in the public catalog immediately
-          setRemoteProducts(prev => [normalizeProduct(created), ...prev]);
+          if (isEdit && typeof editingListingId === 'string') {
+            const updated = await api.updateProduct(editingListingId, payload);
+            const norm = { ...normalizeProduct(updated), isMine: true };
+            setUserListings(prev => prev.map(x => x.id === editingListingId ? norm : x));
+            setRemoteProducts(prev => prev.map(x => x.id === editingListingId ? norm : x));
+          } else {
+            const created = await api.createProduct(payload);
+            setUserListings(prev => [{ ...normalizeProduct(created), isMine: true }, ...prev]);
+            // Also surface it in the public catalog immediately
+            setRemoteProducts(prev => [normalizeProduct(created), ...prev]);
+          }
         } catch (e) {
-          setListingError(e.message || 'Could not publish');
+          setListingError(e.message || (isEdit ? 'Could not update' : 'Could not publish'));
           return;
         }
       }
-      pushToast('✨ Your listing is live!', 'success');
+      pushToast(isEdit ? '✓ Listing updated!' : '✨ Your listing is live!', 'success');
       setListingDraft(emptyListing);
+      setEditingListingId(null);
       // Clear any active filters so the new listing is visible immediately on home
       setSearchQuery('');
       setSelectedGender('All');
       setSelectedVibe(null);
       setSelectedCategory(null);
-      setActiveTab('home');
-      setScreen('app');
+      setActiveTab(isEdit ? 'profile' : 'home');
+      setScreen(isEdit ? 'my-listings' : 'app');
     };
     return (
       <>
         <div className="rv-header">
-          <button className="rv-icon-btn" onClick={() => setActiveTab('home')}><ArrowLeft size={16} strokeWidth={1.8}/></button>
-          <div className="rv-logo rv-serif">List an <span style={{fontStyle:'italic'}}>item</span></div>
+          <button className="rv-icon-btn" onClick={() => {
+            // Cancel = drop draft + edit mode, go back where they came from
+            const wasEditing = !!editingListingId;
+            setListingDraft(emptyListing);
+            setEditingListingId(null);
+            setListingError('');
+            if (wasEditing) { setScreen('my-listings'); } else { setActiveTab('home'); setScreen('app'); }
+          }}><ArrowLeft size={16} strokeWidth={1.8}/></button>
+          <div className="rv-logo rv-serif">{editingListingId ? <>Edit <span style={{fontStyle:'italic'}}>listing</span></> : <>List an <span style={{fontStyle:'italic'}}>item</span></>}</div>
           <div style={{width:38}}/>
         </div>
-        <div style={{padding:'4px 20px 14px',fontSize:12,color:'var(--ink-soft)',fontStyle:'italic'}}>Give it a second life. Set your price in ₹.</div>
+        <div style={{padding:'4px 20px 14px',fontSize:12,color:'var(--ink-soft)',fontStyle:'italic'}}>{editingListingId ? 'Update the details below — changes go live instantly.' : 'Give it a second life. Set your price in ₹.'}</div>
 
         {draft.imgs.length === 0 ? (
           <label style={{display:'block',cursor:'pointer'}}>
@@ -2264,7 +2497,7 @@ export default function Revogue() {
         </div>
         {listingError && <div style={{padding:'0 20px 10px',fontSize:12,color:'#c94848'}}>⚠ {listingError}</div>}
         <div style={{padding:'0 20px 30px'}}>
-          <button className="rv-btn-primary" onClick={publish}>Publish listing</button>
+          <button className="rv-btn-primary" onClick={publish}>{editingListingId ? 'Save changes' : 'Publish listing'}</button>
         </div>
       </>
     );
@@ -2286,31 +2519,54 @@ export default function Revogue() {
         pushToast('Sign in to post', 'info');
         return;
       }
+      const isEdit = !!editingPostId;
       try {
         let imageUrl = draft.postImg;
+        // If user picked a new file (even when editing), upload it
         if (draft.postFile) {
           const { url } = await api.uploadImage(draft.postFile);
           imageUrl = url;
         }
-        const created = await api.createPost({
+        // If editing and the image is still a data URL with no postFile (unchanged), keep it
+        // Otherwise we must have a real http(s) URL to send to the backend
+        if (typeof imageUrl !== 'string' || imageUrl.startsWith('data:')) {
+          pushToast('Photo is still uploading — try again in a moment', 'info');
+          return;
+        }
+        const body = {
           image: imageUrl,
           caption: draft.description || '',
           tags: draft.tags || [],
           products: (draft.taggedProducts || []).filter(id => typeof id === 'string'),
-        });
-        setRemotePosts(prev => [normalizePost(created), ...prev]);
+        };
+        if (isEdit && typeof editingPostId === 'string') {
+          const updated = await api.updatePost(editingPostId, body);
+          const norm = normalizePost(updated);
+          setRemotePosts(prev => prev.map(p => p.id === editingPostId ? norm : p));
+          pushToast('✓ Post updated', 'success');
+        } else {
+          const created = await api.createPost(body);
+          setRemotePosts(prev => [normalizePost(created), ...prev]);
+          pushToast('✨ Posted to Lookbook!', 'success');
+        }
         setListingDraft(emptyListing);
-        pushToast('✨ Posted to Lookbook!', 'success');
+        setEditingPostId(null);
         setActiveTab('style');
+        setScreen('app');  // CRITICAL — was missing, kept user stuck on post-style screen
       } catch (e) {
-        pushToast(e.message || 'Could not post', 'info');
+        pushToast(e.message || (isEdit ? 'Could not update' : 'Could not post'), 'info');
       }
     };
     return (
     <>
       <div className="rv-header">
-        <button className="rv-icon-btn" onClick={() => setActiveTab('style')}><ArrowLeft size={16} strokeWidth={1.8}/></button>
-        <div className="rv-logo rv-serif">Share your <span style={{fontStyle:'italic'}}>fit</span></div>
+        <button className="rv-icon-btn" onClick={() => {
+          setListingDraft(emptyListing);
+          setEditingPostId(null);
+          setActiveTab('style');
+          setScreen('app');  // CRITICAL — back button was leaving screen='post-style' so nothing changed
+        }}><ArrowLeft size={16} strokeWidth={1.8}/></button>
+        <div className="rv-logo rv-serif">{editingPostId ? <>Edit your <span style={{fontStyle:'italic'}}>post</span></> : <>Share your <span style={{fontStyle:'italic'}}>fit</span></>}</div>
         <div style={{width:38}}/>
       </div>
       {listingDraft.postImg ? (
@@ -2346,7 +2602,7 @@ export default function Revogue() {
         </div>
       </div>
       <div style={{padding:'10px 20px 30px'}}>
-        <button className="rv-btn-primary" onClick={publishPost}>Post to Lookbook</button>
+        <button className="rv-btn-primary" onClick={publishPost}>{editingPostId ? 'Save changes' : 'Post to Lookbook'}</button>
       </div>
     </>
     );
@@ -2495,7 +2751,14 @@ export default function Revogue() {
     return (
       <>
         <button className="rv-detail-back" onClick={() => setScreen('app')}><ArrowLeft size={18} strokeWidth={2}/></button>
-        <button className="rv-detail-share"><Share2 size={16} strokeWidth={1.8}/></button>
+        <button className="rv-detail-share" onClick={async () => {
+          const url = `${window.location.origin}/?product=${p.id}`;
+          const text = `Look what I found on Revogue ✨\n${p.title} by ${p.brand} · ₹${p.price} (was ₹${p.originalPrice})\n${url}`;
+          if (navigator.share) {
+            try { await navigator.share({ title: p.title, text, url }); return; } catch { return; }
+          }
+          window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+        }}><Share2 size={16} strokeWidth={1.8}/></button>
         <div className="rv-detail-img">
           <img src={p.img} alt={p.title} onError={(e) => handleImgError(e, p)}/>
         </div>

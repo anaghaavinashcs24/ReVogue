@@ -76,6 +76,8 @@ export const api = {
     return request(`/api/posts${qs ? `?${qs}` : ''}`);
   },
   createPost: (payload) => request('/api/posts', { method: 'POST', body: payload }),
+  updatePost: (id, payload) => request(`/api/posts/${id}`, { method: 'PATCH', body: payload }),
+  deletePost: (id) => request(`/api/posts/${id}`, { method: 'DELETE' }),
   likePost: (id) => request(`/api/posts/${id}/like`, { method: 'POST' }),
   savePost: (id) => request(`/api/posts/${id}/save`, { method: 'POST' }),
   commentPost: (id, text) => request(`/api/posts/${id}/comments`, { method: 'POST', body: { text } }),
