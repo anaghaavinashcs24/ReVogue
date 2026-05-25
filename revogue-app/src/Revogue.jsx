@@ -2043,7 +2043,13 @@ export default function Revogue() {
   // ===== Public Profile (viewing another user) =====
   const renderPublicProfile = () => {
     const u = viewingUser || { username: '', name: '', profile: {}, listings: [], posts: [] };
-    const bg = avatarColors[u.profile?.avatarColor] || avatarColors.terracotta;
+    const profileAvatarColors = {
+      terracotta: 'linear-gradient(135deg, var(--terracotta), var(--gold))',
+      sage: 'linear-gradient(135deg, var(--sage), var(--sage-deep))',
+      pink: 'linear-gradient(135deg, var(--pink), var(--terracotta))',
+      ink: 'linear-gradient(135deg, var(--ink-soft), var(--ink))',
+    };
+    const bg = profileAvatarColors[u.profile?.avatarColor] || profileAvatarColors.terracotta;
     const initial = (u.name || u.username || '?').trim().charAt(0).toUpperCase();
     return (
       <>
