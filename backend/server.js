@@ -12,6 +12,10 @@ const { notFound, errorHandler } = require('./middleware/error');
 
 const app = express();
 
+// Render (and most hosts) put us behind a reverse proxy. Trust the first hop
+// so req.ip / X-Forwarded-For work correctly for rate limiting and logging.
+app.set('trust proxy', 1);
+
 const uploadDir = path.join(__dirname, process.env.UPLOAD_DIR || 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
