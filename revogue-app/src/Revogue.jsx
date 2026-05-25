@@ -26,10 +26,12 @@ const normalizeProduct = (p) => {
 
 const normalizePost = (p) => {
   if (!p) return null;
+  // Backend populates the author and exposes the live avatarUrl on the post itself.
+  const liveAvatarUrl = p.avatarUrl || (p.user && typeof p.user === 'object' && p.user.profile && p.user.profile.avatarUrl) || '';
   return {
     ...p,
     id: p._id || p.id,
-    user: p.username || p.user,
+    user: p.username || (typeof p.user === 'string' ? p.user : p.user?.username) || '',
     img: p.image || p.img,
     fallbackImg: p.fallbackImage || p.fallbackImg,
     products: (p.products || []).map(pp => (typeof pp === 'string' ? pp : pp?._id || pp?.id)).filter(Boolean),
@@ -37,6 +39,7 @@ const normalizePost = (p) => {
     tags: p.tags || [],
     likes: p.likes ?? 0,
     avatar: p.avatar || '✨',
+    avatarUrl: liveAvatarUrl,
     caption: p.caption || '',
   };
 };
@@ -1574,7 +1577,17 @@ export default function Revogue() {
           return (
             <div key={post.id} className="rv-post" style={{animation:`rvSlideUp 0.5s ease ${i*0.1}s backwards`}}>
               <div className="rv-post-head">
-                <div className="rv-post-avatar" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer'}}>{post.avatar}</div>
+                <div className="rv-post-avatar" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer', overflow:'hidden', padding:0}}>
+                  {(() => {
+                    // If this is my post, show MY current local avatar so it updates instantly when I change it.
+                    const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+                    const isMine = post.user === myHandle || post.user === userName?.toLowerCase();
+                    const liveUrl = isMine ? (userAvatar || post.avatarUrl) : post.avatarUrl;
+                    return liveUrl
+                      ? <img src={liveUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                      : post.avatar;
+                  })()}
+                </div>
                 <div style={{flex:1}}>
                   <div className="rv-post-user" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer'}}>@{post.user}{isMyPost && <span style={{marginLeft:6,padding:'1px 6px',background:'var(--sage)',color:'white',borderRadius:6,fontSize:8,fontWeight:600,letterSpacing:0.5}}>YOU</span>}</div>
                   <div className="rv-post-time">{post.createdAt ? new Date(post.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short' }) : '2h ago'} · {post.tags[0] || ''}</div>

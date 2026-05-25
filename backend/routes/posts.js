@@ -26,7 +26,8 @@ router.get('/', optionalAuth, async (req, res, next) => {
 
     const [items, total] = await Promise.all([
       Post.find(filter).sort({ createdAt: -1 }).skip(skip).limit(lim)
-        .populate('products', 'title price images brand category'),
+        .populate('products', 'title price images brand category')
+        .populate('user', 'username profile.avatarUrl profile.avatarColor'),
       Post.countDocuments(filter),
     ]);
 
@@ -35,6 +36,10 @@ router.get('/', optionalAuth, async (req, res, next) => {
       o.likedByMe = req.user ? p.likedBy.some(id => String(id) === String(req.user._id)) : false;
       o.savedByMe = req.user ? p.savedBy.some(id => String(id) === String(req.user._id)) : false;
       o.commentCount = p.comments.length;
+      // Live avatar from the user document (so profile pic updates are reflected)
+      if (o.user && o.user.profile && o.user.profile.avatarUrl) {
+        o.avatarUrl = o.user.profile.avatarUrl;
+      }
       delete o.likedBy;
       delete o.savedBy;
       return o;
@@ -52,12 +57,16 @@ router.get('/:id', optionalAuth, async (req, res, next) => {
       throw new Error('Invalid post id');
     }
     const p = await Post.findById(req.params.id)
-      .populate('products', 'title price images brand category');
+      .populate('products', 'title price images brand category')
+      .populate('user', 'username profile.avatarUrl profile.avatarColor');
     if (!p) {
       res.status(404);
       throw new Error('Post not found');
     }
     const o = p.toObject();
+    if (o.user && o.user.profile && o.user.profile.avatarUrl) {
+      o.avatarUrl = o.user.profile.avatarUrl;
+    }
     o.likedByMe = req.user ? p.likedBy.some(id => String(id) === String(req.user._id)) : false;
     o.savedByMe = req.user ? p.savedBy.some(id => String(id) === String(req.user._id)) : false;
     res.json(o);
