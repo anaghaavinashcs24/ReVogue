@@ -291,6 +291,9 @@ export default function Revogue() {
   // Search tab has its own query so Home's chips (gender/vibe/category) + search bar
   // don't leak into Search. The Search tab uses ONLY this query and ignores Home's filters.
   const [searchTabQuery, setSearchTabQuery] = useState('');
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const emptyFilters = { gender: 'All', category: null, vibe: null, condition: 'All', maxPrice: null, sortBy: 'newest' };
+  const [searchFilters, setSearchFilters] = useState(emptyFilters);
   // ----- Backend-sourced state -----
   const [remoteProducts, setRemoteProducts] = useState([]);
   const [remotePosts, setRemotePosts] = useState([]);
@@ -635,24 +638,40 @@ export default function Revogue() {
     });
   }, [searchQuery, selectedGender, selectedVibe, selectedCategory, allProducts]);
 
-  // Search tab uses ONLY searchTabQuery — no gender/vibe/category filters apply here.
-  // This keeps the Search page independent of any filters the user set on Home.
+  // Search tab uses searchTabQuery + searchFilters (independent from Home filters).
   const searchTabProducts = useMemo(() => {
-    if (!searchTabQuery) return allProducts;
-    const raw = searchTabQuery.toLowerCase().trim();
+    const raw = (searchTabQuery || '').toLowerCase().trim();
     const priceMatch = raw.match(/(?:under|below|less than|<)\s*[₹$]?\s*(\d+)/);
-    return allProducts.filter(p => {
-      if (priceMatch) {
-        if (p.price > Number(priceMatch[1])) return false;
-        const rest = raw.replace(priceMatch[0], '').trim();
-        if (!rest) return true;
-        const tokens = rest.split(/\s+/).filter(Boolean);
-        return tokens.every(tok => fieldsInclude(p, tok));
-      }
-      const tokens = raw.split(/\s+/).filter(Boolean);
-      return tokens.every(tok => fieldsInclude(p, tok));
+    const queryTokens = (() => {
+      if (!raw) return [];
+      const stripped = priceMatch ? raw.replace(priceMatch[0], '').trim() : raw;
+      return stripped.split(/\s+/).filter(Boolean);
+    })();
+    const filtered = allProducts.filter(p => {
+      if (priceMatch && p.price > Number(priceMatch[1])) return false;
+      if (queryTokens.length && !queryTokens.every(tok => fieldsInclude(p, tok))) return false;
+      if (searchFilters.gender !== 'All' && p.gender !== searchFilters.gender) return false;
+      if (searchFilters.category && p.category !== searchFilters.category) return false;
+      if (searchFilters.vibe && !(p.tags || []).includes(searchFilters.vibe)) return false;
+      if (searchFilters.condition !== 'All' && p.condition !== searchFilters.condition) return false;
+      if (searchFilters.maxPrice != null && p.price > searchFilters.maxPrice) return false;
+      return true;
     });
-  }, [searchTabQuery, allProducts]);
+    const sorted = [...filtered];
+    if (searchFilters.sortBy === 'priceAsc') sorted.sort((a, b) => a.price - b.price);
+    else if (searchFilters.sortBy === 'priceDesc') sorted.sort((a, b) => b.price - a.price);
+    else if (searchFilters.sortBy === 'popular') sorted.sort((a, b) => (b.likes || 0) - (a.likes || 0));
+    return sorted;
+  }, [searchTabQuery, searchFilters, allProducts]);
+
+  const activeFilterCount = (
+    (searchFilters.gender !== 'All' ? 1 : 0) +
+    (searchFilters.category ? 1 : 0) +
+    (searchFilters.vibe ? 1 : 0) +
+    (searchFilters.condition !== 'All' ? 1 : 0) +
+    (searchFilters.maxPrice != null ? 1 : 0) +
+    (searchFilters.sortBy !== 'newest' ? 1 : 0)
+  );
 
   // ============ STYLES ============
   const styles = `
@@ -1173,7 +1192,12 @@ export default function Revogue() {
     <>
       <div className="rv-header">
         <div className="rv-logo rv-serif">Discover</div>
-        <button className="rv-icon-btn"><Filter size={16} strokeWidth={1.8}/></button>
+        <button className="rv-icon-btn" onClick={() => setFilterSheetOpen(true)} style={{position:'relative'}}>
+          <Filter size={16} strokeWidth={1.8}/>
+          {activeFilterCount > 0 && (
+            <span style={{position:'absolute',top:-2,right:-2,background:'var(--terracotta)',color:'white',borderRadius:'50%',width:16,height:16,fontSize:10,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:600}}>{activeFilterCount}</span>
+          )}
+        </button>
       </div>
       <div className="rv-search-wrap">
         <div className="rv-search">
@@ -1225,6 +1249,64 @@ export default function Revogue() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {filterSheetOpen && (
+        <div onClick={() => setFilterSheetOpen(false)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.4)',zIndex:1000,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'rvFadeIn 0.2s ease'}}>
+          <div onClick={(e) => e.stopPropagation()} style={{background:'var(--paper)',width:'100%',maxWidth:480,borderRadius:'20px 20px 0 0',padding:'20px 20px 30px',maxHeight:'85vh',overflowY:'auto',animation:'rvSlideUp 0.3s ease'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+              <div className="rv-logo rv-serif" style={{fontSize:20}}>Filters</div>
+              <button onClick={() => setFilterSheetOpen(false)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',display:'flex',padding:4}}><X size={20}/></button>
+            </div>
+
+            <div className="rv-label" style={{marginTop:8}}>Gender</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {['All','Women','Men','Unisex'].map(g => (
+                <button key={g} onClick={() => setSearchFilters(f => ({...f, gender: g}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.gender === g ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.gender === g ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.gender === g ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{g}</button>
+              ))}
+            </div>
+
+            <div className="rv-label" style={{marginTop:18}}>Category</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {CATEGORIES.map(c => (
+                <button key={c.name} onClick={() => setSearchFilters(f => ({...f, category: f.category === c.name ? null : c.name}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.category === c.name ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.category === c.name ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.category === c.name ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{c.emoji} {c.name}</button>
+              ))}
+            </div>
+
+            <div className="rv-label" style={{marginTop:18}}>Vibe</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {VIBES.map(v => (
+                <button key={v.name} onClick={() => setSearchFilters(f => ({...f, vibe: f.vibe === v.name ? null : v.name}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.vibe === v.name ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.vibe === v.name ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.vibe === v.name ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{v.emoji} {v.name}</button>
+              ))}
+            </div>
+
+            <div className="rv-label" style={{marginTop:18}}>Condition</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {['All','Like New','Excellent','Good'].map(c => (
+                <button key={c} onClick={() => setSearchFilters(f => ({...f, condition: c}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.condition === c ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.condition === c ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.condition === c ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{c}</button>
+              ))}
+            </div>
+
+            <div className="rv-label" style={{marginTop:18}}>Max price</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {[{label:'Any',v:null},{label:'Under ₹500',v:500},{label:'Under ₹1000',v:1000},{label:'Under ₹2000',v:2000}].map(opt => (
+                <button key={opt.label} onClick={() => setSearchFilters(f => ({...f, maxPrice: opt.v}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.maxPrice === opt.v ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.maxPrice === opt.v ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.maxPrice === opt.v ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{opt.label}</button>
+              ))}
+            </div>
+
+            <div className="rv-label" style={{marginTop:18}}>Sort by</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:8}}>
+              {[{label:'Newest',v:'newest'},{label:'Price ↑',v:'priceAsc'},{label:'Price ↓',v:'priceDesc'},{label:'Popular',v:'popular'}].map(opt => (
+                <button key={opt.v} onClick={() => setSearchFilters(f => ({...f, sortBy: opt.v}))} style={{padding:'8px 14px',borderRadius:20,border: searchFilters.sortBy === opt.v ? '1.5px solid var(--terracotta)' : '1px solid #d6cab4',background: searchFilters.sortBy === opt.v ? '#faf2e8' : 'var(--paper)',fontSize:12,cursor:'pointer',fontFamily:'inherit',color: searchFilters.sortBy === opt.v ? 'var(--terracotta)' : 'var(--ink)',fontWeight:500}}>{opt.label}</button>
+              ))}
+            </div>
+
+            <div style={{display:'flex',gap:8,marginTop:24}}>
+              <button onClick={() => setSearchFilters(emptyFilters)} style={{flex:1,padding:14,borderRadius:24,border:'1px solid #d6cab4',background:'var(--paper)',fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Clear all</button>
+              <button onClick={() => setFilterSheetOpen(false)} style={{flex:2,padding:14,borderRadius:24,border:'none',background:'var(--ink)',color:'var(--paper)',fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Show {searchTabProducts.length} {searchTabProducts.length === 1 ? 'item' : 'items'}</button>
+            </div>
+          </div>
         </div>
       )}
     </>
