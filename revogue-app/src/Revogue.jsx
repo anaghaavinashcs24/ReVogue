@@ -262,7 +262,8 @@ export default function Revogue() {
   const [userContact, setUserContact] = useState('');
   const [contactError, setContactError] = useState('');
   const [userListings, setUserListings] = useState([]);
-  const [userAvatar, setUserAvatar] = useState(null); // data URL for custom uploaded avatar
+  const [userAvatar, setUserAvatar] = useState(null); // data URL or remote URL for the signed-in user's avatar
+  const [myUsername, setMyUsername] = useState(''); // backend-generated username, used to match own posts
   const emptyListing = { title: '', brand: '', price: '', originalPrice: '', category: '', condition: '', size: 'M', gender: 'Unisex', description: '', tags: [], imgs: [] };
   const [listingDraft, setListingDraft] = useState(emptyListing);
   const [listingError, setListingError] = useState('');
@@ -397,6 +398,7 @@ export default function Revogue() {
       const { token, user } = await (authMode === 'signup' ? api.signup(payload) : api.signin(payload));
       setToken(token);
       setUserName(user.name);
+      setMyUsername(user.username || '');
       setUserProfile(p => ({
         ...p,
         email: user.email || '',
@@ -475,6 +477,7 @@ export default function Revogue() {
       try {
         const { user } = await api.me();
         setUserName(user.name);
+        setMyUsername(user.username || '');
         setUserProfile(p => ({
           ...p,
           email: user.email || '',
@@ -1490,7 +1493,7 @@ export default function Revogue() {
       if (!username) return;
       const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
       // Tapping your own handle → take you to your profile tab, not the public view
-      if (username === myHandle || username === userName?.toLowerCase()) {
+      if (username === myUsername || username === myHandle || username === userName?.toLowerCase()) {
         setActiveTab('profile');
         return;
       }
@@ -1573,16 +1576,14 @@ export default function Revogue() {
           const saved = postSaves[post.id] !== undefined ? !!postSaves[post.id] : !!post.savedByMe;
           // A post is "mine" if its username matches my username — works for both backend posts and edited ones
           const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
-          const isMyPost = !!getToken() && (post.user === myHandle || post.user === userName?.toLowerCase());
+          const isMyPost = !!getToken() && (post.user === myUsername || post.user === myHandle || post.user === userName?.toLowerCase());
           return (
             <div key={post.id} className="rv-post" style={{animation:`rvSlideUp 0.5s ease ${i*0.1}s backwards`}}>
               <div className="rv-post-head">
                 <div className="rv-post-avatar" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer', overflow:'hidden', padding:0}}>
                   {(() => {
                     // If this is my post, show MY current local avatar so it updates instantly when I change it.
-                    const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
-                    const isMine = post.user === myHandle || post.user === userName?.toLowerCase();
-                    const liveUrl = isMine ? (userAvatar || post.avatarUrl) : post.avatarUrl;
+                    const liveUrl = isMyPost ? (userAvatar || post.avatarUrl) : post.avatarUrl;
                     return liveUrl
                       ? <img src={liveUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                       : post.avatar;
@@ -1925,7 +1926,7 @@ export default function Revogue() {
           setAddresses([]); setPaymentMethods([]); setSustainStats(null);
           setPostLikes({}); setPostSaves({}); setPostComments({}); setOpenComments(null);
           setHydrated(false);
-          setUserAvatar(null); setActiveTab('home');
+          setUserAvatar(null); setMyUsername(''); setActiveTab('home');
           setUserProfile({ bio: 'Curating pre-loved treasures ✨', location: 'Bengaluru, IN', avatarColor: 'terracotta', email: '', phone: '' });
         }} style={{width:'100%',padding:14,background:'transparent',border:'1px solid #d6cab4',borderRadius:14,fontFamily:'inherit',fontSize:12,letterSpacing:1,textTransform:'uppercase',color:'var(--ink-soft)',cursor:'pointer'}}>Sign out</button>
       </div>
@@ -2260,7 +2261,7 @@ export default function Revogue() {
   const renderMyLooks = () => {
     const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
     const lowerName = userName?.toLowerCase() || '';
-    const mine = remotePosts.filter(p => p.user === myHandle || p.user === lowerName);
+    const mine = remotePosts.filter(p => p.user === myUsername || p.user === myHandle || p.user === lowerName);
     const deleteMyPost = async (postId) => {
       if (!confirm('Delete this look?')) return;
       const snapshot = remotePosts;
