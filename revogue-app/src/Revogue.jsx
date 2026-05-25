@@ -263,10 +263,22 @@ export default function Revogue() {
   const emptyListing = { title: '', brand: '', price: '', originalPrice: '', category: '', condition: '', size: 'M', gender: 'Unisex', description: '', tags: [], imgs: [] };
   const [listingDraft, setListingDraft] = useState(emptyListing);
   const [listingError, setListingError] = useState('');
-  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup'
+  const [authMode, setAuthMode] = useState('signin'); // 'signin' | 'signup' | 'forgot-email' | 'forgot-answer'
   const [authPassword, setAuthPassword] = useState('');
   const [authError, setAuthError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const SECURITY_QUESTIONS = [
+    'What is your favorite city?',
+    'What was the name of your first pet?',
+    "What is your mother's maiden name?",
+    'What was your childhood nickname?',
+    'What is the name of your favorite teacher?',
+  ];
+  const [signupSecurityQuestion, setSignupSecurityQuestion] = useState(SECURITY_QUESTIONS[0]);
+  const [signupSecurityAnswer, setSignupSecurityAnswer] = useState('');
+  const [forgotQuestion, setForgotQuestion] = useState('');
+  const [forgotAnswer, setForgotAnswer] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
   const [orders, setOrders] = useState([]);
   const [addresses, setAddresses] = useState([
     { id: 1, label: 'Home', name: 'You', line1: '2nd Cross Rd, Indiranagar', city: 'Bengaluru', state: 'Karnataka', pin: '560038', phone: '+91 98XXX XXXXX', isDefault: true },
@@ -336,6 +348,37 @@ export default function Revogue() {
     if (!/[a-zA-Z]/.test(v) && !isPhone(v)) return 'Enter a valid phone number';
     return '';
   };
+  const handleForgotEmail = async () => {
+    setAuthError('');
+    const err = validateContact(userContact);
+    if (err) { setContactError(err); return; }
+    setContactError('');
+    try {
+      const { securityQuestion } = await api.forgotPassword(userContact);
+      setForgotQuestion(securityQuestion);
+      setForgotAnswer('');
+      setForgotNewPassword('');
+      setAuthMode('forgot-answer');
+    } catch (e) {
+      setAuthError(e.message || 'Could not find that account');
+    }
+  };
+  const handleResetPassword = async () => {
+    setAuthError('');
+    if (!forgotAnswer.trim()) { setAuthError('Please answer the security question'); return; }
+    if (!forgotNewPassword || forgotNewPassword.length < 6) { setAuthError('New password must be at least 6 characters'); return; }
+    try {
+      await api.resetPassword({ contact: userContact, securityAnswer: forgotAnswer.trim(), newPassword: forgotNewPassword });
+      pushToast('Password updated · sign in with your new password', 'success');
+      setAuthPassword('');
+      setForgotAnswer('');
+      setForgotNewPassword('');
+      setForgotQuestion('');
+      setAuthMode('signin');
+    } catch (e) {
+      setAuthError(e.message || 'Could not reset password');
+    }
+  };
   const handleLogin = async () => {
     setAuthError('');
     if (authMode === 'signup' && !userName.trim()) { setAuthError('Please enter your name'); return; }
@@ -343,9 +386,10 @@ export default function Revogue() {
     if (err) { setContactError(err); return; }
     setContactError('');
     if (!authPassword || authPassword.length < 6) { setAuthError('Password must be at least 6 characters'); return; }
+    if (authMode === 'signup' && !signupSecurityAnswer.trim()) { setAuthError('Please answer the security question'); return; }
     try {
       const payload = authMode === 'signup'
-        ? { name: userName.trim(), contact: userContact, password: authPassword }
+        ? { name: userName.trim(), contact: userContact, password: authPassword, securityQuestion: signupSecurityQuestion, securityAnswer: signupSecurityAnswer.trim() }
         : { contact: userContact, password: authPassword };
       const { token, user } = await (authMode === 'signup' ? api.signup(payload) : api.signin(payload));
       setToken(token);
@@ -974,6 +1018,9 @@ export default function Revogue() {
 
   if (screen === 'role') {
     const isSignUp = authMode === 'signup';
+    const isForgotEmail = authMode === 'forgot-email';
+    const isForgotAnswer = authMode === 'forgot-answer';
+    const isForgot = isForgotEmail || isForgotAnswer;
     return (
       <div className="revogue-root">
         <style>{styles}</style>
@@ -987,51 +1034,116 @@ export default function Revogue() {
                   <div className="rv-role-sub">THRIFT · STYLE · REPEAT</div>
                 </div>
                 <div className="rv-role-title rv-serif">
-                  {isSignUp ? <>Join the <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>circle</em>.</> : <>Welcome <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>back</em>.</>}
+                  {isForgot ? <>Reset <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>password</em>.</> :
+                   isSignUp ? <>Join the <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>circle</em>.</> :
+                   <>Welcome <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>back</em>.</>}
                 </div>
                 <div className="rv-role-desc">
-                  {isSignUp ? "Create an account to shop, sell, and share your pre-loved style." : "Sign in to pick up where you left off — your wishlist is waiting."}
+                  {isForgotEmail ? "Enter your email or phone — we'll show your security question." :
+                   isForgotAnswer ? "Answer your security question to set a new password." :
+                   isSignUp ? "Create an account to shop, sell, and share your pre-loved style." :
+                   "Sign in to pick up where you left off — your wishlist is waiting."}
                 </div>
 
-                {/* Tab switcher */}
-                <div style={{display:'flex',background:'var(--cream)',padding:4,borderRadius:14,marginBottom:20,border:'1px solid #e0d5c0'}}>
-                  <button onClick={() => { setAuthMode('signin'); setAuthError(''); setContactError(''); }} style={{flex:1,padding:'10px 0',background: !isSignUp ? 'var(--paper)' : 'transparent',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',color: !isSignUp ? 'var(--ink)' : 'var(--ink-soft)',boxShadow: !isSignUp ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',transition:'all 0.2s'}}>Sign in</button>
-                  <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{flex:1,padding:'10px 0',background: isSignUp ? 'var(--paper)' : 'transparent',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',color: isSignUp ? 'var(--ink)' : 'var(--ink-soft)',boxShadow: isSignUp ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',transition:'all 0.2s'}}>Create account</button>
-                </div>
+                {!isForgot && (
+                  <div style={{display:'flex',background:'var(--cream)',padding:4,borderRadius:14,marginBottom:20,border:'1px solid #e0d5c0'}}>
+                    <button onClick={() => { setAuthMode('signin'); setAuthError(''); setContactError(''); }} style={{flex:1,padding:'10px 0',background: !isSignUp ? 'var(--paper)' : 'transparent',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',color: !isSignUp ? 'var(--ink)' : 'var(--ink-soft)',boxShadow: !isSignUp ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',transition:'all 0.2s'}}>Sign in</button>
+                    <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{flex:1,padding:'10px 0',background: isSignUp ? 'var(--paper)' : 'transparent',border:'none',borderRadius:10,fontFamily:'inherit',fontSize:13,fontWeight:600,cursor:'pointer',color: isSignUp ? 'var(--ink)' : 'var(--ink-soft)',boxShadow: isSignUp ? '0 2px 6px rgba(0,0,0,0.06)' : 'none',transition:'all 0.2s'}}>Create account</button>
+                  </div>
+                )}
 
                 {isSignUp && (
                   <input className="rv-input" placeholder="Your name" value={userName} onChange={e => setUserName(e.target.value)} />
                 )}
-                <input
-                  className="rv-input"
-                  placeholder="Email or phone"
-                  value={userContact}
-                  onChange={e => { setUserContact(e.target.value); if (contactError) setContactError(''); }}
-                  style={{ borderColor: contactError ? '#c94848' : undefined, marginBottom: contactError ? 4 : 12 }}
-                />
-                {contactError && <div style={{ fontSize: 11, color: '#c94848', marginBottom: 12, paddingLeft: 4 }}>⚠ {contactError}</div>}
-                <div style={{position:'relative',marginBottom:12}}>
-                  <input
-                    className="rv-input"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder={isSignUp ? "Create a password (min. 6 chars)" : "Password"}
-                    value={authPassword}
-                    onChange={e => { setAuthPassword(e.target.value); if (authError) setAuthError(''); }}
-                    style={{ paddingRight: 44, marginBottom: 0, borderColor: authError ? '#c94848' : undefined }}
-                  />
-                  <button onClick={() => setShowPassword(!showPassword)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',padding:4,display:'flex'}}>
-                    {showPassword ? <EyeOff size={16} strokeWidth={1.8}/> : <Eye size={16} strokeWidth={1.8}/>}
-                  </button>
-                </div>
+
+                {!isForgotAnswer && (
+                  <>
+                    <input
+                      className="rv-input"
+                      placeholder="Email or phone"
+                      value={userContact}
+                      onChange={e => { setUserContact(e.target.value); if (contactError) setContactError(''); }}
+                      style={{ borderColor: contactError ? '#c94848' : undefined, marginBottom: contactError ? 4 : 12 }}
+                    />
+                    {contactError && <div style={{ fontSize: 11, color: '#c94848', marginBottom: 12, paddingLeft: 4 }}>⚠ {contactError}</div>}
+                  </>
+                )}
+
+                {!isForgot && (
+                  <div style={{position:'relative',marginBottom:12}}>
+                    <input
+                      className="rv-input"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder={isSignUp ? "Create a password (min. 6 chars)" : "Password"}
+                      value={authPassword}
+                      onChange={e => { setAuthPassword(e.target.value); if (authError) setAuthError(''); }}
+                      style={{ paddingRight: 44, marginBottom: 0, borderColor: authError ? '#c94848' : undefined }}
+                    />
+                    <button onClick={() => setShowPassword(!showPassword)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',padding:4,display:'flex'}}>
+                      {showPassword ? <EyeOff size={16} strokeWidth={1.8}/> : <Eye size={16} strokeWidth={1.8}/>}
+                    </button>
+                  </div>
+                )}
+
+                {isSignUp && (
+                  <>
+                    <div style={{fontSize:11,color:'var(--ink-soft)',marginBottom:6,marginTop:4,paddingLeft:4}}>Security question (used to reset password)</div>
+                    <select className="rv-input" value={signupSecurityQuestion} onChange={e => setSignupSecurityQuestion(e.target.value)} style={{cursor:'pointer'}}>
+                      {SECURITY_QUESTIONS.map(q => <option key={q} value={q}>{q}</option>)}
+                    </select>
+                    <input className="rv-input" placeholder="Your answer (case-insensitive)" value={signupSecurityAnswer} onChange={e => setSignupSecurityAnswer(e.target.value)} />
+                  </>
+                )}
+
+                {isForgotAnswer && (
+                  <>
+                    <div style={{padding:14,background:'var(--cream)',borderRadius:12,marginBottom:12,fontSize:13,fontFamily:'Fraunces, serif',fontStyle:'italic'}}>"{forgotQuestion}"</div>
+                    <input className="rv-input" placeholder="Your answer" value={forgotAnswer} onChange={e => { setForgotAnswer(e.target.value); if (authError) setAuthError(''); }} />
+                    <div style={{position:'relative',marginBottom:12}}>
+                      <input
+                        className="rv-input"
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="New password (min. 6 chars)"
+                        value={forgotNewPassword}
+                        onChange={e => { setForgotNewPassword(e.target.value); if (authError) setAuthError(''); }}
+                        style={{ paddingRight: 44, marginBottom: 0 }}
+                      />
+                      <button onClick={() => setShowPassword(!showPassword)} style={{position:'absolute',right:14,top:'50%',transform:'translateY(-50%)',background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',padding:4,display:'flex'}}>
+                        {showPassword ? <EyeOff size={16} strokeWidth={1.8}/> : <Eye size={16} strokeWidth={1.8}/>}
+                      </button>
+                    </div>
+                  </>
+                )}
+
                 {authError && <div style={{ fontSize: 11, color: '#c94848', marginBottom: 12, paddingLeft: 4 }}>⚠ {authError}</div>}
 
-                <button className="rv-btn-primary" disabled={!userContact || !authPassword || (isSignUp && !userName)} onClick={handleLogin}>
-                  {isSignUp ? 'Create account' : 'Sign in'}
-                </button>
+                {isForgotEmail ? (
+                  <button className="rv-btn-primary" disabled={!userContact} onClick={handleForgotEmail}>Continue</button>
+                ) : isForgotAnswer ? (
+                  <button className="rv-btn-primary" disabled={!forgotAnswer || !forgotNewPassword} onClick={handleResetPassword}>Update password</button>
+                ) : (
+                  <button className="rv-btn-primary" disabled={!userContact || !authPassword || (isSignUp && (!userName || !signupSecurityAnswer))} onClick={handleLogin}>
+                    {isSignUp ? 'Create account' : 'Sign in'}
+                  </button>
+                )}
 
-                <div style={{ textAlign: 'center', marginTop: 18, fontSize: 11, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-                  {isSignUp ? <>By creating an account, you agree to our <span style={{color:'var(--ink)',textDecoration:'underline'}}>Terms</span> & <span style={{color:'var(--ink)',textDecoration:'underline'}}>Privacy</span> ♡</> : <>Don't have an account? <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{background:'none',border:'none',color:'var(--terracotta)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11}}>Create one</button></>}
-                </div>
+                {!isSignUp && !isForgot && (
+                  <div style={{textAlign:'center',marginTop:12}}>
+                    <button onClick={() => { setAuthMode('forgot-email'); setAuthError(''); setContactError(''); }} style={{background:'none',border:'none',color:'var(--ink-soft)',fontFamily:'inherit',fontSize:12,cursor:'pointer',textDecoration:'underline'}}>Forgot password?</button>
+                  </div>
+                )}
+
+                {isForgot && (
+                  <div style={{textAlign:'center',marginTop:14}}>
+                    <button onClick={() => { setAuthMode('signin'); setAuthError(''); setContactError(''); setForgotAnswer(''); setForgotNewPassword(''); }} style={{background:'none',border:'none',color:'var(--ink-soft)',fontFamily:'inherit',fontSize:12,cursor:'pointer',textDecoration:'underline'}}>← Back to sign in</button>
+                  </div>
+                )}
+
+                {!isForgot && (
+                  <div style={{ textAlign: 'center', marginTop: 18, fontSize: 11, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
+                    {isSignUp ? <>By creating an account, you agree to our <span style={{color:'var(--ink)',textDecoration:'underline'}}>Terms</span> & <span style={{color:'var(--ink)',textDecoration:'underline'}}>Privacy</span> ♡</> : <>Don't have an account? <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{background:'none',border:'none',color:'var(--terracotta)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11}}>Create one</button></>}
+                  </div>
+                )}
               </div>
             </div>
           </div>

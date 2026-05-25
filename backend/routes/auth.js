@@ -17,7 +17,7 @@ function validateContact(contact) {
 // POST /api/auth/signup
 router.post('/signup', async (req, res, next) => {
   try {
-    const { name, contact, password, role } = req.body;
+    const { name, contact, password, role, securityQuestion, securityAnswer } = req.body;
     if (!name || !String(name).trim()) {
       res.status(400);
       throw new Error('Please enter your name');
@@ -42,6 +42,10 @@ router.post('/signup', async (req, res, next) => {
       throw new Error('An account already exists with this email/phone');
     }
 
+    const securityAnswerHash = securityQuestion && securityAnswer
+      ? await User.hashSecurityAnswer(securityAnswer)
+      : '';
+
     const user = await User.create({
       name: name.trim(),
       ...query,
@@ -49,10 +53,75 @@ router.post('/signup', async (req, res, next) => {
       role: ['buyer', 'seller', 'both'].includes(role) ? role : 'buyer',
       username: name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 24) +
         '_' + Math.random().toString(36).slice(2, 6),
+      securityQuestion: securityQuestion || '',
+      securityAnswerHash,
     });
 
     const token = signToken(user._id);
     res.status(201).json({ token, user: user.toSafeJSON() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/forgot-password — step 1: returns the user's security question
+router.post('/forgot-password', async (req, res, next) => {
+  try {
+    const { contact } = req.body;
+    const contactErr = validateContact(contact);
+    if (contactErr) {
+      res.status(400);
+      throw new Error(contactErr);
+    }
+    const query = isEmail(contact)
+      ? { email: contact.toLowerCase().trim() }
+      : { phone: contact.trim() };
+    const user = await User.findOne(query);
+    if (!user || !user.securityQuestion) {
+      // Generic message so we don't leak which emails exist
+      res.status(404);
+      throw new Error('No reset option found for this account');
+    }
+    res.json({ securityQuestion: user.securityQuestion });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// POST /api/auth/reset-password — step 2: verifies answer + sets new password
+router.post('/reset-password', async (req, res, next) => {
+  try {
+    const { contact, securityAnswer, newPassword } = req.body;
+    const contactErr = validateContact(contact);
+    if (contactErr) {
+      res.status(400);
+      throw new Error(contactErr);
+    }
+    if (!securityAnswer || !String(securityAnswer).trim()) {
+      res.status(400);
+      throw new Error('Please answer the security question');
+    }
+    if (!newPassword || newPassword.length < 6) {
+      res.status(400);
+      throw new Error('New password must be at least 6 characters');
+    }
+    const query = isEmail(contact)
+      ? { email: contact.toLowerCase().trim() }
+      : { phone: contact.trim() };
+    const user = await User.findOne(query).select('+securityAnswerHash +password');
+    if (!user || !user.securityAnswerHash) {
+      res.status(401);
+      throw new Error('Could not verify your account');
+    }
+    const ok = await user.compareSecurityAnswer(securityAnswer);
+    if (!ok) {
+      res.status(401);
+      throw new Error('That answer is not correct');
+    }
+    user.password = newPassword;
+    await user.save();
+    const token = signToken(user._id);
+    res.json({ message: 'Password updated', token, user: user.toSafeJSON() });
   } catch (err) {
     next(err);
   }

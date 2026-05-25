@@ -34,6 +34,8 @@ const userSchema = new mongoose.Schema({
   settings: { type: settingsSchema, default: () => ({}) },
   wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
   cart: [cartItemSchema],
+  securityQuestion: { type: String, default: '' },
+  securityAnswerHash: { type: String, default: '', select: false },
   sellerRating: { type: Number, default: 5.0, min: 0, max: 5 },
   sellerSalesCount: { type: Number, default: 0 },
   sustainabilityScore: { type: Number, default: 0 },
@@ -51,6 +53,16 @@ userSchema.pre('save', async function (next) {
 
 userSchema.methods.comparePassword = function (candidate) {
   return bcrypt.compare(candidate, this.password);
+};
+
+userSchema.methods.compareSecurityAnswer = function (candidate) {
+  if (!this.securityAnswerHash) return Promise.resolve(false);
+  return bcrypt.compare(String(candidate).trim().toLowerCase(), this.securityAnswerHash);
+};
+
+userSchema.statics.hashSecurityAnswer = async function (answer) {
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(String(answer).trim().toLowerCase(), salt);
 };
 
 userSchema.methods.toSafeJSON = function () {

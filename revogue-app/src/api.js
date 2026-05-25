@@ -40,6 +40,8 @@ export const api = {
   signup: (payload) => request('/api/auth/signup', { method: 'POST', body: payload }),
   signin: (payload) => request('/api/auth/signin', { method: 'POST', body: payload }),
   me: () => request('/api/auth/me'),
+  forgotPassword: (contact) => request('/api/auth/forgot-password', { method: 'POST', body: { contact } }),
+  resetPassword: (payload) => request('/api/auth/reset-password', { method: 'POST', body: payload }),
 
   // --- products ---
   listProducts: (params = {}) => {
