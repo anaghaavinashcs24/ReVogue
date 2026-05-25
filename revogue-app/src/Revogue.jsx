@@ -247,6 +247,7 @@ export default function Revogue() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [viewingUser, setViewingUser] = useState(null); // { username, name, profile, listings, posts, ... }
   const [viewingUserLoading, setViewingUserLoading] = useState(false);
+  const [lightboxImage, setLightboxImage] = useState(null); // url string when open, null when closed
   const [wishlist, setWishlist] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1503,7 +1504,7 @@ export default function Revogue() {
                   <Bookmark size={18} strokeWidth={1.8} fill={saved ? 'var(--terracotta)' : 'none'}/>
                 </button>
               </div>
-              <div className="rv-post-img" onDoubleClick={() => { if (!liked) toggleLike(post.id); }}>
+              <div className="rv-post-img" onDoubleClick={() => { if (!liked) toggleLike(post.id); }} onClick={() => setLightboxImage(post.img)} style={{cursor:'zoom-in'}}>
                 <img src={post.img} alt="outfit" loading="lazy" onError={(e) => { if (e.currentTarget.src !== post.fallbackImg && post.fallbackImg) e.currentTarget.src = post.fallbackImg; }}/>
               </div>
               <div className="rv-post-actions">
@@ -1775,6 +1776,7 @@ export default function Revogue() {
           { icon: <Package size={16} strokeWidth={1.8}/>, label: 'My Listings', action: () => setScreen('my-listings') },
           { icon: <ShoppingBag size={16} strokeWidth={1.8}/>, label: 'My Orders', action: () => setScreen('my-orders') },
           { icon: <Heart size={16} strokeWidth={1.8}/>, label: 'Wishlist', action: () => setActiveTab('wishlist') },
+          { icon: <Bookmark size={16} strokeWidth={1.8}/>, label: 'Saved Looks', action: () => setScreen('saved-looks') },
           { icon: <MapPin size={16} strokeWidth={1.8}/>, label: 'Shipping Addresses', action: () => setScreen('addresses') },
           { icon: <CreditCard size={16} strokeWidth={1.8}/>, label: 'Payment Methods', action: () => setScreen('payment-methods') },
           { icon: <Award size={16} strokeWidth={1.8}/>, label: 'Sustainability Score', action: () => setScreen('sustainability') },
@@ -2103,7 +2105,7 @@ export default function Revogue() {
                     <div style={{padding:'8px 20px 4px',fontSize:11,letterSpacing:1.5,textTransform:'uppercase',color:'var(--ink-soft)'}}>Lookbook</div>
                     <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,padding:'4px 0 30px'}}>
                       {u.posts.map(p => (
-                        <div key={p._id || p.id} style={{aspectRatio:'1',overflow:'hidden',cursor:'pointer'}}>
+                        <div key={p._id || p.id} style={{aspectRatio:'1',overflow:'hidden',cursor:'zoom-in'}} onClick={() => setLightboxImage(p.image || p.img)}>
                           <img src={p.image || p.img} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e) => { if (p.fallbackImage && e.currentTarget.src !== p.fallbackImage) e.currentTarget.src = p.fallbackImage; }}/>
                         </div>
                       ))}
@@ -2117,6 +2119,36 @@ export default function Revogue() {
               </>
             )}
           </>
+        )}
+      </>
+    );
+  };
+
+  // ===== Saved Looks =====
+  const renderSavedLooks = () => {
+    const saved = remotePosts.filter(p => p.savedByMe);
+    return (
+      <>
+        <SubHeader title={<>Saved <span style={{fontStyle:'italic'}}>Looks</span></>}/>
+        {saved.length === 0 ? (
+          <div className="rv-empty">
+            <div className="rv-empty-icon">🔖</div>
+            <div className="rv-empty-title rv-serif">Nothing saved yet</div>
+            <div className="rv-empty-text">Bookmark looks from the Lookbook to find them here.</div>
+            <button onClick={() => { setActiveTab('style'); setScreen('app'); }} style={{marginTop:20,padding:'12px 24px',background:'var(--ink)',color:'var(--paper)',border:'none',borderRadius:24,fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Browse Lookbook</button>
+          </div>
+        ) : (
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:6,padding:'10px 12px 30px'}}>
+            {saved.map(p => (
+              <div key={p.id} style={{position:'relative',aspectRatio:'3/4',overflow:'hidden',borderRadius:12,cursor:'pointer'}} onClick={() => setLightboxImage(p.image || p.img)}>
+                <img src={p.image || p.img} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e) => { if (p.fallbackImage && e.currentTarget.src !== p.fallbackImage) e.currentTarget.src = p.fallbackImage; }}/>
+                <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 60%,rgba(0,0,0,0.6))',padding:8,display:'flex',flexDirection:'column',justifyContent:'flex-end'}}>
+                  <div style={{color:'white',fontSize:10,fontWeight:600}}>@{p.user}</div>
+                  <div style={{color:'rgba(255,255,255,0.85)',fontSize:9,marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{p.caption}</div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </>
     );
@@ -2972,7 +3004,7 @@ export default function Revogue() {
           }
           window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
         }}><Share2 size={16} strokeWidth={1.8}/></button>
-        <div className="rv-detail-img">
+        <div className="rv-detail-img" onClick={() => setLightboxImage(p.img)} style={{cursor:'zoom-in'}}>
           <img src={p.img} alt={p.title} onError={(e) => handleImgError(e, p)}/>
         </div>
         <div className="rv-detail-body">
@@ -3063,6 +3095,7 @@ export default function Revogue() {
   else if (screen === 'edit-profile') content = renderEditProfile();
   else if (screen === 'my-listings') content = renderMyListings();
   else if (screen === 'public-profile') content = renderPublicProfile();
+  else if (screen === 'saved-looks') content = renderSavedLooks();
   else if (screen === 'my-orders') content = renderMyOrders();
   else if (screen === 'addresses') content = renderAddresses();
   else if (screen === 'payment-methods') content = renderPaymentMethods();
@@ -3076,7 +3109,7 @@ export default function Revogue() {
   else if (activeTab === 'wishlist') content = renderWishlist();
   else if (activeTab === 'bag') content = renderBag();
 
-  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile'];
+  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile', 'saved-looks'];
   const showTabBar = !subPages.includes(screen);
 
   return (
@@ -3097,6 +3130,14 @@ export default function Revogue() {
                   <span>{t.msg}</span>
                 </div>
               ))}
+            </div>
+          )}
+          {lightboxImage && (
+            <div onClick={() => setLightboxImage(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.92)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',cursor:'zoom-out',animation:'rvFadeIn 0.2s ease'}}>
+              <button onClick={(e) => { e.stopPropagation(); setLightboxImage(null); }} style={{position:'absolute',top:20,right:20,background:'rgba(255,255,255,0.15)',border:'none',color:'white',width:36,height:36,borderRadius:'50%',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',backdropFilter:'blur(8px)'}}>
+                <X size={20}/>
+              </button>
+              <img src={lightboxImage} alt="" style={{maxWidth:'94%',maxHeight:'90%',objectFit:'contain',borderRadius:8,boxShadow:'0 20px 50px rgba(0,0,0,0.5)'}}/>
             </div>
           )}
           {showTabBar && (
