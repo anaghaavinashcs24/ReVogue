@@ -4,10 +4,21 @@ const { protect } = require('../middleware/auth');
 
 const router = express.Router();
 
-function publicUrl(req, filename) {
+function diskUrl(req, filename) {
   const proto = req.headers['x-forwarded-proto'] || req.protocol;
   const host = req.headers['x-forwarded-host'] || req.get('host');
   return `${proto}://${host}/uploads/${filename}`;
+}
+
+function fileToPayload(req, file) {
+  // Cloudinary's multer storage sets file.path to the secure URL and file.filename to the public_id.
+  const url = upload.isCloudinary ? file.path : diskUrl(req, file.filename);
+  return {
+    url,
+    filename: file.filename,
+    mimetype: file.mimetype,
+    size: file.size,
+  };
 }
 
 // POST /api/uploads  (multipart/form-data; field "image")
@@ -17,12 +28,7 @@ router.post('/', protect, upload.single('image'), (req, res, next) => {
       res.status(400);
       throw new Error('No image uploaded');
     }
-    res.status(201).json({
-      url: publicUrl(req, req.file.filename),
-      filename: req.file.filename,
-      mimetype: req.file.mimetype,
-      size: req.file.size,
-    });
+    res.status(201).json(fileToPayload(req, req.file));
   } catch (err) { next(err); }
 });
 
@@ -34,12 +40,7 @@ router.post('/multiple', protect, upload.array('images', 6), (req, res, next) =>
       throw new Error('No images uploaded');
     }
     res.status(201).json({
-      files: req.files.map(f => ({
-        url: publicUrl(req, f.filename),
-        filename: f.filename,
-        mimetype: f.mimetype,
-        size: f.size,
-      })),
+      files: req.files.map(f => fileToPayload(req, f)),
     });
   } catch (err) { next(err); }
 });
