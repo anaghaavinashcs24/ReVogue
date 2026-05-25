@@ -1876,7 +1876,7 @@ export default function Revogue() {
       <div className="rv-prof-stats">
         <div className="rv-prof-stat"><div className="rv-prof-stat-num rv-serif">{wishlist.length}</div><div className="rv-prof-stat-label">Saved</div></div>
         <div className="rv-prof-stat" style={{borderLeft:'1px solid #d6cab4',borderRight:'1px solid #d6cab4'}}><div className="rv-prof-stat-num rv-serif">{userListings.length}</div><div className="rv-prof-stat-label">{userRole === 'seller' ? 'Listed' : 'Listed'}</div></div>
-        <div className="rv-prof-stat"><div className="rv-prof-stat-num rv-serif">{userRole === 'seller' ? '4.8' : '23'}</div><div className="rv-prof-stat-label">{userRole === 'seller' ? 'Rating' : 'Styled'}</div></div>
+        <div className="rv-prof-stat"><div className="rv-prof-stat-num rv-serif">{userRole === 'seller' ? '4.8' : remotePosts.filter(p => p.user === (userName || '').toLowerCase().replace(/\s/g, '_') || p.user === userName?.toLowerCase()).length}</div><div className="rv-prof-stat-label">{userRole === 'seller' ? 'Rating' : 'Styled'}</div></div>
       </div>
 
       <div style={{padding:'0 20px 14px'}}>
