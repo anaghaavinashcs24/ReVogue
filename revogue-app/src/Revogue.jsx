@@ -2634,11 +2634,30 @@ export default function Revogue() {
           </div>
         </div>
 
+        {sustainStats?.breakdown && (
+          <div style={{padding:'0 20px 16px'}}>
+            <div style={{background:'var(--paper)',borderRadius:16,padding:14,border:'1px solid #eae0cc'}}>
+              <div style={{fontFamily:'Fraunces, serif',fontSize:15,fontWeight:600,marginBottom:10}}>Points breakdown</div>
+              {[
+                { label: 'Purchases',  emoji: '🛍️', data: sustainStats.breakdown.purchases },
+                { label: 'Sales',      emoji: '💚', data: sustainStats.breakdown.sales },
+                { label: 'Listings',   emoji: '🏷️', data: sustainStats.breakdown.listings },
+                { label: 'Lookbook posts', emoji: '✨', data: sustainStats.breakdown.posts },
+              ].map(row => (
+                <div key={row.label} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderTop:'1px solid #f0e6d0'}}>
+                  <div style={{display:'flex',alignItems:'center',gap:8,fontSize:12}}><span style={{fontSize:14}}>{row.emoji}</span> {row.label} <span style={{color:'var(--ink-soft)',fontSize:11}}>×{row.data.count}</span></div>
+                  <div style={{fontFamily:'Fraunces, serif',fontSize:14,fontWeight:600,color:'var(--sage-deep)'}}>+{row.data.points}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div style={{padding:'0 20px 30px'}}>
           <div style={{background:'var(--cream)',borderRadius:16,padding:16,border:'1px solid #eae0cc'}}>
             <div style={{fontFamily:'Fraunces, serif',fontSize:15,fontWeight:600,marginBottom:8}}>How we calculate</div>
             <div style={{fontSize:12,color:'var(--ink-soft)',lineHeight:1.6}}>
-              We estimate ~10kg CO₂ and ~2,700L of water saved per pre-loved garment vs buying new. Your tier grows as you buy and sell more.
+              We estimate ~5.4 kg CO₂ and ~2,700 L of water saved per pre-loved garment vs buying new. Points: <strong>+12</strong> per purchase, <strong>+15</strong> per sale, <strong>+8</strong> per listing, <strong>+3</strong> per Lookbook post.
             </div>
           </div>
         </div>

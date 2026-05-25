@@ -1,6 +1,8 @@
 const express = require('express');
 const User = require('../models/User');
 const Order = require('../models/Order');
+const Product = require('../models/Product');
+const Post = require('../models/Post');
 const { protect } = require('../middleware/auth');
 
 const router = express.Router();
@@ -10,12 +12,16 @@ router.use(protect);
 router.get('/me', async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id)
-      .select('itemsRescued co2SavedKg waterSavedLiters sustainabilityScore');
+      .select('itemsRescued co2SavedKg waterSavedLiters sustainabilityScore sellerSalesCount');
 
-    const orders = await Order.countDocuments({
-      user: req.user._id,
-      status: { $in: ['placed', 'confirmed', 'packed', 'shipped', 'delivered'] },
-    });
+    const [orders, listingsCount, postsCount] = await Promise.all([
+      Order.countDocuments({
+        user: req.user._id,
+        status: { $in: ['placed', 'confirmed', 'packed', 'shipped', 'delivered'] },
+      }),
+      Product.countDocuments({ seller: req.user._id }),
+      Post.countDocuments({ user: req.user._id }),
+    ]);
 
     const tier = (() => {
       const s = user.sustainabilityScore;
@@ -33,6 +39,12 @@ router.get('/me', async (req, res, next) => {
       score: user.sustainabilityScore,
       ordersCount: orders,
       tier,
+      breakdown: {
+        purchases: { count: user.itemsRescued, points: user.itemsRescued * 12, pointsEach: 12 },
+        sales:     { count: user.sellerSalesCount || 0, points: (user.sellerSalesCount || 0) * 15, pointsEach: 15 },
+        listings:  { count: listingsCount, points: listingsCount * 8, pointsEach: 8 },
+        posts:     { count: postsCount, points: postsCount * 3, pointsEach: 3 },
+      },
     });
   } catch (err) { next(err); }
 });

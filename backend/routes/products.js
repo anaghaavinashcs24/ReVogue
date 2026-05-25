@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Product = require('../models/Product');
+const User = require('../models/User');
 const { protect, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -133,6 +134,9 @@ router.post('/', protect, async (req, res, next) => {
       sellerRating: req.user.sellerRating || 4.8,
     });
 
+    // Award listing points (+8 per item — encourages giving clothes a second life)
+    await User.updateOne({ _id: req.user._id }, { $inc: { sustainabilityScore: 8 } });
+
     res.status(201).json(product);
   } catch (err) {
     next(err);
@@ -175,6 +179,11 @@ router.delete('/:id', protect, async (req, res, next) => {
       throw new Error('You can only delete your own listings');
     }
     await product.deleteOne();
+    // Reverse the +8 awarded at listing time (floor at 0 via guard)
+    await User.updateOne(
+      { _id: req.user._id, sustainabilityScore: { $gte: 8 } },
+      { $inc: { sustainabilityScore: -8 } }
+    );
     res.json({ message: 'Listing removed' });
   } catch (err) {
     next(err);

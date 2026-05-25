@@ -1,6 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const Post = require('../models/Post');
+const User = require('../models/User');
 const { protect, optionalAuth } = require('../middleware/auth');
 
 const router = express.Router();
@@ -91,6 +92,8 @@ router.post('/', protect, async (req, res, next) => {
       tags: Array.isArray(tags) ? tags : [],
       products: Array.isArray(products) ? products : [],
     });
+    // Award community points (+3 per post) for sharing styles
+    await User.updateOne({ _id: req.user._id }, { $inc: { sustainabilityScore: 3 } });
     res.status(201).json(post);
   } catch (err) { next(err); }
 });
@@ -216,6 +219,11 @@ router.delete('/:id', protect, async (req, res, next) => {
       throw new Error('You can only delete your own posts');
     }
     await post.deleteOne();
+    // Reverse the +3 awarded at creation (floor at 0 to avoid negatives)
+    await User.updateOne(
+      { _id: req.user._id, sustainabilityScore: { $gte: 3 } },
+      { $inc: { sustainabilityScore: -3 } }
+    );
     res.json({ message: 'Post removed' });
   } catch (err) { next(err); }
 });

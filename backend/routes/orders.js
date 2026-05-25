@@ -164,7 +164,8 @@ router.post('/', async (req, res, next) => {
       return m;
     }, new Map());
     for (const [sid, qty] of sellerCount) {
-      await User.updateOne({ _id: sid }, { $inc: { sellerSalesCount: qty } });
+      // Sellers get +15 points per item sold — rewards giving items a new life
+      await User.updateOne({ _id: sid }, { $inc: { sellerSalesCount: qty, sustainabilityScore: qty * 15 } });
     }
 
     res.status(201).json(order);
