@@ -98,6 +98,7 @@ export const api = {
   updateProfile: (payload) => request('/api/users/me', { method: 'PATCH', body: payload }),
   updateSettings: (payload) => request('/api/users/me/settings', { method: 'PATCH', body: payload }),
   updateAvatar: (payload) => request('/api/users/me/avatar', { method: 'PATCH', body: payload }),
+  getPublicProfile: (idOrUsername) => request(`/api/users/${encodeURIComponent(idOrUsername)}`),
 
   // --- sustainability ---
   getSustainability: () => request('/api/sustainability/me'),

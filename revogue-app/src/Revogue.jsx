@@ -245,6 +245,8 @@ export default function Revogue() {
   const [userName, setUserName] = useState('');
   const [activeTab, setActiveTab] = useState('home');
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [viewingUser, setViewingUser] = useState(null); // { username, name, profile, listings, posts, ... }
+  const [viewingUserLoading, setViewingUserLoading] = useState(false);
   const [wishlist, setWishlist] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1286,6 +1288,51 @@ export default function Revogue() {
         pushToast(e.message || 'Save failed', 'info');
       }
     };
+    const openUserProfile = async (username) => {
+      if (!username) return;
+      const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+      // Tapping your own handle → take you to your profile tab, not the public view
+      if (username === myHandle || username === userName?.toLowerCase()) {
+        setActiveTab('profile');
+        return;
+      }
+      setViewingUserLoading(true);
+      setViewingUser({ username, name: username, profile: {}, listings: [], posts: [] });
+      setScreen('public-profile');
+      try {
+        const profileRes = await api.getPublicProfile(username);
+        const u = profileRes.user || profileRes;
+        const isPrivate = u.isPrivate || u.settings?.privateProfile || false;
+        const userId = u._id;
+        let listings = [];
+        let posts = [];
+        if (!isPrivate && userId) {
+          const [lRes, pRes] = await Promise.all([
+            api.listProducts({ seller: userId, limit: 30 }).catch(() => ({ items: [] })),
+            api.listPosts({ user: userId, limit: 30 }).catch(() => ({ items: [] })),
+          ]);
+          listings = lRes.items || lRes || [];
+          posts = pRes.items || [];
+        }
+        setViewingUser({
+          username: u.username,
+          name: u.name,
+          profile: u.profile || {},
+          sellerRating: u.sellerRating,
+          sellerSalesCount: u.sellerSalesCount,
+          sustainabilityScore: u.sustainabilityScore,
+          isPrivate,
+          listingsCount: profileRes.listingsCount || 0,
+          listings,
+          posts,
+        });
+      } catch (e) {
+        pushToast(e.message || 'Could not load profile', 'info');
+        setScreen('app');
+      } finally {
+        setViewingUserLoading(false);
+      }
+    };
     const sharePost = async (post) => {
       const url = `${window.location.origin}/?look=${post.id}`;
       const text = `Check out this look on Revogue ✨\n"${post.caption || ''}"\n@${post.user} · ${url}`;
@@ -1332,9 +1379,9 @@ export default function Revogue() {
           return (
             <div key={post.id} className="rv-post" style={{animation:`rvSlideUp 0.5s ease ${i*0.1}s backwards`}}>
               <div className="rv-post-head">
-                <div className="rv-post-avatar">{post.avatar}</div>
+                <div className="rv-post-avatar" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer'}}>{post.avatar}</div>
                 <div style={{flex:1}}>
-                  <div className="rv-post-user">@{post.user}{isMyPost && <span style={{marginLeft:6,padding:'1px 6px',background:'var(--sage)',color:'white',borderRadius:6,fontSize:8,fontWeight:600,letterSpacing:0.5}}>YOU</span>}</div>
+                  <div className="rv-post-user" onClick={() => openUserProfile(post.user)} style={{cursor:'pointer'}}>@{post.user}{isMyPost && <span style={{marginLeft:6,padding:'1px 6px',background:'var(--sage)',color:'white',borderRadius:6,fontSize:8,fontWeight:600,letterSpacing:0.5}}>YOU</span>}</div>
                   <div className="rv-post-time">{post.createdAt ? new Date(post.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short' }) : '2h ago'} · {post.tags[0] || ''}</div>
                 </div>
                 {isMyPost && (
@@ -1390,7 +1437,7 @@ export default function Revogue() {
                   <Share2 size={18} strokeWidth={1.8}/>
                 </button>
               </div>
-              <div className="rv-post-caption"><strong>@{post.user}</strong>{post.caption}</div>
+              <div className="rv-post-caption"><strong onClick={() => openUserProfile(post.user)} style={{cursor:'pointer'}}>@{post.user}</strong>{post.caption}</div>
               <div className="rv-post-tags">{post.tags.join(' · ')}</div>
               {post.products.length > 0 && (
                 <div style={{padding:'0 14px 14px',display:'flex',gap:8,overflowX:'auto'}}>
@@ -1908,6 +1955,90 @@ export default function Revogue() {
       )}
     </>
   );
+
+  // ===== Public Profile (viewing another user) =====
+  const renderPublicProfile = () => {
+    const u = viewingUser || { username: '', name: '', profile: {}, listings: [], posts: [] };
+    const bg = avatarColors[u.profile?.avatarColor] || avatarColors.terracotta;
+    const initial = (u.name || u.username || '?').trim().charAt(0).toUpperCase();
+    return (
+      <>
+        <SubHeader title={<><span style={{fontStyle:'italic'}}>@{u.username}</span></>} onBack={() => { setScreen('app'); setActiveTab('style'); }}/>
+        {viewingUserLoading ? (
+          <div style={{padding:60,textAlign:'center',color:'var(--ink-soft)',fontSize:13}}>Loading profile…</div>
+        ) : (
+          <>
+            <div style={{padding:'20px 20px 24px',textAlign:'center'}}>
+              <div className="rv-prof-avatar" style={{background: bg, overflow:'hidden', padding:0, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto'}}>
+                {u.profile?.avatarUrl ? (
+                  <img src={u.profile.avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                ) : (
+                  <span style={{fontFamily:'Fraunces, serif',fontSize:32,color:'white',fontWeight:500}}>{initial}</span>
+                )}
+              </div>
+              <div style={{marginTop:14,fontFamily:'Fraunces, serif',fontSize:22}}>{u.name || u.username}</div>
+              <div style={{fontSize:12,color:'var(--ink-soft)',marginTop:4}}>@{u.username}</div>
+              {u.profile?.bio && <div style={{fontSize:12,color:'var(--ink-soft)',marginTop:12,padding:'0 30px',lineHeight:1.5,fontStyle:'italic'}}>"{u.profile.bio}"</div>}
+              {u.profile?.location && <div style={{fontSize:11,color:'var(--ink-soft)',marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:4}}><MapPin size={11} strokeWidth={1.8}/> {u.profile.location}</div>}
+              {u.sellerRating != null && (
+                <div style={{display:'flex',justifyContent:'center',gap:24,marginTop:18,fontSize:11,color:'var(--ink-soft)'}}>
+                  <div><strong style={{color:'var(--ink)',fontSize:14,fontFamily:'Fraunces, serif'}}>{u.sellerRating?.toFixed?.(1) || u.sellerRating}</strong> rating</div>
+                  <div><strong style={{color:'var(--ink)',fontSize:14,fontFamily:'Fraunces, serif'}}>{u.listings.length || u.listingsCount || 0}</strong> listings</div>
+                  <div><strong style={{color:'var(--ink)',fontSize:14,fontFamily:'Fraunces, serif'}}>{u.posts.length}</strong> posts</div>
+                </div>
+              )}
+            </div>
+
+            {u.isPrivate ? (
+              <div style={{padding:40,textAlign:'center',color:'var(--ink-soft)',fontSize:13,fontStyle:'italic'}}>This profile is private 🔒</div>
+            ) : (
+              <>
+                {u.listings.length > 0 && (
+                  <>
+                    <div style={{padding:'8px 20px 4px',fontSize:11,letterSpacing:1.5,textTransform:'uppercase',color:'var(--ink-soft)'}}>Listings</div>
+                    <div className="rv-grid" style={{padding:'8px 20px 20px'}}>
+                      {u.listings.map((p, i) => {
+                        const np = normalizeProduct(p);
+                        return (
+                          <div key={np.id || p._id} className="rv-card" style={{animationDelay:`${i*0.04}s`}} onClick={() => { setSelectedProduct(np); setScreen('detail'); }}>
+                            <div className="rv-card-img"><img src={np.img} alt={np.title} loading="lazy" onError={(e) => handleImgError(e, np)}/></div>
+                            <div className="rv-card-body">
+                              <div className="rv-card-title">{np.title}</div>
+                              <div className="rv-card-meta">
+                                <div className="rv-card-price">₹{np.price}</div>
+                                <div className="rv-card-orig">₹{np.originalPrice}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {u.posts.length > 0 && (
+                  <>
+                    <div style={{padding:'8px 20px 4px',fontSize:11,letterSpacing:1.5,textTransform:'uppercase',color:'var(--ink-soft)'}}>Lookbook</div>
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:2,padding:'4px 0 30px'}}>
+                      {u.posts.map(p => (
+                        <div key={p._id || p.id} style={{aspectRatio:'1',overflow:'hidden',cursor:'pointer'}}>
+                          <img src={p.image || p.img} alt="" loading="lazy" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e) => { if (p.fallbackImage && e.currentTarget.src !== p.fallbackImage) e.currentTarget.src = p.fallbackImage; }}/>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+
+                {u.listings.length === 0 && u.posts.length === 0 && (
+                  <div style={{padding:40,textAlign:'center',color:'var(--ink-soft)',fontSize:13,fontStyle:'italic'}}>Nothing here yet ✨</div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </>
+    );
+  };
 
   // ===== My Orders =====
   const renderMyOrders = () => (
@@ -2849,6 +2980,7 @@ export default function Revogue() {
   else if (screen === 'post-style') content = renderPostStyle();
   else if (screen === 'edit-profile') content = renderEditProfile();
   else if (screen === 'my-listings') content = renderMyListings();
+  else if (screen === 'public-profile') content = renderPublicProfile();
   else if (screen === 'my-orders') content = renderMyOrders();
   else if (screen === 'addresses') content = renderAddresses();
   else if (screen === 'payment-methods') content = renderPaymentMethods();
@@ -2862,7 +2994,7 @@ export default function Revogue() {
   else if (activeTab === 'wishlist') content = renderWishlist();
   else if (activeTab === 'bag') content = renderBag();
 
-  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings'];
+  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile'];
   const showTabBar = !subPages.includes(screen);
 
   return (
