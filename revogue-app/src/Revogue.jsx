@@ -1888,6 +1888,7 @@ export default function Revogue() {
           { icon: <Package size={16} strokeWidth={1.8}/>, label: 'My Listings', action: () => setScreen('my-listings') },
           { icon: <ShoppingBag size={16} strokeWidth={1.8}/>, label: 'My Orders', action: () => setScreen('my-orders') },
           { icon: <Heart size={16} strokeWidth={1.8}/>, label: 'Wishlist', action: () => setActiveTab('wishlist') },
+          { icon: <Sparkles size={16} strokeWidth={1.8}/>, label: 'My Looks', action: () => setScreen('my-looks') },
           { icon: <Bookmark size={16} strokeWidth={1.8}/>, label: 'Saved Looks', action: () => setScreen('saved-looks') },
           { icon: <MapPin size={16} strokeWidth={1.8}/>, label: 'Shipping Addresses', action: () => setScreen('addresses') },
           { icon: <CreditCard size={16} strokeWidth={1.8}/>, label: 'Payment Methods', action: () => setScreen('payment-methods') },
@@ -2237,6 +2238,68 @@ export default function Revogue() {
               </>
             )}
           </>
+        )}
+      </>
+    );
+  };
+
+  // ===== My Looks (posts I authored) =====
+  const renderMyLooks = () => {
+    const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+    const lowerName = userName?.toLowerCase() || '';
+    const mine = remotePosts.filter(p => p.user === myHandle || p.user === lowerName);
+    const deleteMyPost = async (postId) => {
+      if (!confirm('Delete this look?')) return;
+      const snapshot = remotePosts;
+      setRemotePosts(prev => prev.filter(p => p.id !== postId));
+      try { await api.deletePost(postId); pushToast('Post deleted', 'success'); }
+      catch (e) { setRemotePosts(snapshot); pushToast(e.message || 'Could not delete', 'info'); }
+    };
+    const editMyPost = (post) => {
+      setListingDraft({
+        ...emptyListing,
+        description: post.caption || '',
+        tags: post.tags || [],
+        postImg: post.img,
+        postFile: null,
+        taggedProducts: post.products || [],
+      });
+      setEditingPostId(post.id);
+      setScreen('post-style');
+    };
+    return (
+      <>
+        <SubHeader title={<>My <span style={{fontStyle:'italic'}}>Looks</span></>} action={<button className="rv-icon-btn" onClick={() => setScreen('post-style')}><Plus size={16} strokeWidth={2}/></button>}/>
+        {mine.length === 0 ? (
+          <div className="rv-empty">
+            <div className="rv-empty-icon">✨</div>
+            <div className="rv-empty-title rv-serif">No looks yet</div>
+            <div className="rv-empty-text">Post your first outfit and inspire the community.</div>
+            <button onClick={() => setScreen('post-style')} style={{marginTop:20,padding:'12px 24px',background:'var(--ink)',color:'var(--paper)',border:'none',borderRadius:24,fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Post a look</button>
+          </div>
+        ) : (
+          <div style={{padding:'10px 14px 30px',display:'flex',flexDirection:'column',gap:14}}>
+            {mine.map(post => (
+              <div key={post.id} style={{display:'flex',gap:12,padding:12,background:'var(--cream)',borderRadius:14,border:'1px solid #eae0cc'}}>
+                <div onClick={() => setLightboxImage(post.img)} style={{width:90,height:120,borderRadius:10,overflow:'hidden',flexShrink:0,cursor:'zoom-in',background:'#eee'}}>
+                  <img src={post.img} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e) => { if (post.fallbackImage && e.currentTarget.src !== post.fallbackImage) e.currentTarget.src = post.fallbackImage; }}/>
+                </div>
+                <div style={{flex:1,minWidth:0,display:'flex',flexDirection:'column'}}>
+                  <div style={{fontSize:11,color:'var(--ink-soft)',marginBottom:4}}>{post.createdAt ? new Date(post.createdAt).toLocaleString('en-IN', { day:'numeric', month:'short', year:'numeric' }) : 'Recent'}</div>
+                  <div style={{fontFamily:'Fraunces, serif',fontSize:13,lineHeight:1.4,marginBottom:6,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{post.caption || <em style={{color:'var(--ink-soft)'}}>(no caption)</em>}</div>
+                  <div style={{display:'flex',gap:12,fontSize:11,color:'var(--ink-soft)',marginTop:'auto'}}>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Heart size={11}/> {post.likes || 0}</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:3}}><MessageCircle size={11}/> {(post.comments || []).length}</span>
+                    {post.products?.length > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Package size={11}/> {post.products.length}</span>}
+                  </div>
+                </div>
+                <div style={{display:'flex',flexDirection:'column',gap:6}}>
+                  <button onClick={() => editMyPost(post)} style={{background:'var(--paper)',border:'1px solid #d6cab4',cursor:'pointer',color:'var(--ink)',width:32,height:32,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><Edit3 size={14} strokeWidth={1.8}/></button>
+                  <button onClick={() => deleteMyPost(post.id)} style={{background:'var(--paper)',border:'1px solid #d6cab4',cursor:'pointer',color:'#c94848',width:32,height:32,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center'}}><Trash2 size={14} strokeWidth={1.8}/></button>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </>
     );
@@ -3213,6 +3276,7 @@ export default function Revogue() {
   else if (screen === 'edit-profile') content = renderEditProfile();
   else if (screen === 'my-listings') content = renderMyListings();
   else if (screen === 'public-profile') content = renderPublicProfile();
+  else if (screen === 'my-looks') content = renderMyLooks();
   else if (screen === 'saved-looks') content = renderSavedLooks();
   else if (screen === 'my-orders') content = renderMyOrders();
   else if (screen === 'addresses') content = renderAddresses();
@@ -3227,7 +3291,7 @@ export default function Revogue() {
   else if (activeTab === 'wishlist') content = renderWishlist();
   else if (activeTab === 'bag') content = renderBag();
 
-  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile', 'saved-looks'];
+  const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile', 'saved-looks', 'my-looks'];
   const showTabBar = !subPages.includes(screen);
 
   return (
