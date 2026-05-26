@@ -54,12 +54,17 @@ router.get('/', optionalAuth, async (req, res, next) => {
     const skip = (Math.max(Number(page), 1) - 1) * lim;
 
     const [items, total] = await Promise.all([
-      Product.find(filter).sort(sortBy).skip(skip).limit(lim).populate('seller', 'username name profile.avatarUrl sellerRating'),
+      Product.find(filter).sort(sortBy).skip(skip).limit(lim).populate('seller', 'username name profile.avatarUrl sellerRating deactivated'),
       Product.countDocuments(filter),
     ]);
 
+    // Hide items whose seller has been deactivated (unless caller is fetching their own listings)
+    const visible = (mine === 'true' && req.user)
+      ? items
+      : items.filter(p => !p.seller || !p.seller.deactivated);
+
     res.json({
-      items,
+      items: visible,
       page: Number(page),
       limit: lim,
       total,

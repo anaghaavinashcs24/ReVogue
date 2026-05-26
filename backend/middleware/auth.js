@@ -21,6 +21,10 @@ async function protect(req, res, next) {
       res.status(401);
       throw new Error('Not authorized, user no longer exists');
     }
+    if (user.deactivated) {
+      res.status(403);
+      throw new Error('This account has been deactivated due to community reports.');
+    }
     req.user = user;
     next();
   } catch (err) {

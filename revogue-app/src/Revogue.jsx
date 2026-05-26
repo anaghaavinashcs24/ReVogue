@@ -2195,8 +2195,26 @@ export default function Revogue() {
               </div>
               <div style={{marginTop:14,fontFamily:'Fraunces, serif',fontSize:22}}>{u.name || u.username}</div>
               <div style={{fontSize:12,color:'var(--ink-soft)',marginTop:4}}>@{u.username}</div>
+              {u.deactivated && <div style={{display:'inline-block',marginTop:8,padding:'4px 10px',background:'#fde2e0',color:'#c94848',borderRadius:8,fontSize:10,letterSpacing:1,textTransform:'uppercase',fontWeight:600}}>Account deactivated</div>}
               {u.profile?.bio && <div style={{fontSize:12,color:'var(--ink-soft)',marginTop:12,padding:'0 30px',lineHeight:1.5,fontStyle:'italic'}}>"{u.profile.bio}"</div>}
               {u.profile?.location && <div style={{fontSize:11,color:'var(--ink-soft)',marginTop:6,display:'flex',alignItems:'center',justifyContent:'center',gap:4}}><MapPin size={11} strokeWidth={1.8}/> {u.profile.location}</div>}
+              {!u.deactivated && u.username && u.username !== myUsername && (
+                <div style={{marginTop:14}}>
+                  <button
+                    onClick={async () => {
+                      if (!getToken()) { pushToast('Sign in to report users', 'info'); return; }
+                      if (!confirm(`Report @${u.username} for selling fakes?\n\nIf 3 different members report this user, their account will be deactivated automatically.`)) return;
+                      try {
+                        const r = await api.flagUser(u.username);
+                        pushToast(r.message || 'Reported', r.deactivated ? 'success' : 'info');
+                      } catch (e) {
+                        pushToast(e.message || 'Could not report', 'info');
+                      }
+                    }}
+                    style={{background:'none',border:'1px solid #d6cab4',color:'#c94848',padding:'8px 16px',borderRadius:20,fontSize:11,letterSpacing:0.5,cursor:'pointer',fontFamily:'inherit',fontWeight:500}}
+                  >🚩 Report this seller</button>
+                </div>
+              )}
               {u.sellerRating != null && (
                 <div style={{display:'flex',justifyContent:'center',gap:24,marginTop:18,fontSize:11,color:'var(--ink-soft)'}}>
                   <div><strong style={{color:'var(--ink)',fontSize:14,fontFamily:'Fraunces, serif'}}>{u.sellerRating?.toFixed?.(1) || u.sellerRating}</strong> rating</div>
@@ -3259,6 +3277,21 @@ export default function Revogue() {
               <div className="rv-seller-name">@{p.seller}</div>
               <div className="rv-seller-rating"><Star size={11} fill="var(--gold)" color="var(--gold)" strokeWidth={0}/> {p.sellerRating} · Verified seller</div>
             </div>
+            {p.seller && p.seller !== myUsername && (
+              <button
+                onClick={async () => {
+                  if (!getToken()) { pushToast('Sign in to report sellers', 'info'); return; }
+                  if (!confirm(`Report @${p.seller} for selling fakes?\n\nIf 3 different members report this seller, their account will be deactivated automatically.`)) return;
+                  try {
+                    const r = await api.flagUser(p.seller);
+                    pushToast(r.message || 'Reported', r.deactivated ? 'success' : 'info');
+                  } catch (e) {
+                    pushToast(e.message || 'Could not report', 'info');
+                  }
+                }}
+                style={{background:'none',border:'1px solid #d6cab4',color:'#c94848',padding:'6px 10px',borderRadius:10,fontSize:10,letterSpacing:0.5,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500,whiteSpace:'nowrap'}}
+              >🚩 Report</button>
+            )}
           </div>
 
           <div className="rv-desc-title rv-serif">The story</div>

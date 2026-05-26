@@ -28,11 +28,14 @@ router.get('/', optionalAuth, async (req, res, next) => {
     const [items, total] = await Promise.all([
       Post.find(filter).sort({ createdAt: -1 }).skip(skip).limit(lim)
         .populate('products', 'title price images brand category')
-        .populate('user', 'username profile.avatarUrl profile.avatarColor'),
+        .populate('user', 'username profile.avatarUrl profile.avatarColor deactivated'),
       Post.countDocuments(filter),
     ]);
 
-    const enriched = items.map(p => {
+    // Drop posts authored by deactivated users
+    const live = items.filter(p => !p.user || !p.user.deactivated);
+
+    const enriched = live.map(p => {
       const o = p.toObject();
       o.likedByMe = req.user ? p.likedBy.some(id => String(id) === String(req.user._id)) : false;
       o.savedByMe = req.user ? p.savedBy.some(id => String(id) === String(req.user._id)) : false;

@@ -154,6 +154,10 @@ router.post('/signin', async (req, res, next) => {
       res.status(401);
       throw new Error('Invalid credentials');
     }
+    if (user.deactivated) {
+      res.status(403);
+      throw new Error('This account has been deactivated due to community reports.');
+    }
     const token = signToken(user._id);
     res.json({ token, user: user.toSafeJSON() });
   } catch (err) {

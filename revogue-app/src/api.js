@@ -101,6 +101,8 @@ export const api = {
   updateSettings: (payload) => request('/api/users/me/settings', { method: 'PATCH', body: payload }),
   updateAvatar: (payload) => request('/api/users/me/avatar', { method: 'PATCH', body: payload }),
   getPublicProfile: (idOrUsername) => request(`/api/users/${encodeURIComponent(idOrUsername)}`),
+  flagUser: (idOrUsername) => request(`/api/users/${encodeURIComponent(idOrUsername)}/flag`, { method: 'POST' }),
+  unflagUser: (idOrUsername) => request(`/api/users/${encodeURIComponent(idOrUsername)}/unflag`, { method: 'POST' }),
 
   // --- sustainability ---
   getSustainability: () => request('/api/sustainability/me'),

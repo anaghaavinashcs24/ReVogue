@@ -62,7 +62,7 @@ router.get('/:idOrUsername', async (req, res, next) => {
     const key = req.params.idOrUsername;
     const user = await User.findOne({
       $or: [{ username: key }, ...(key.match(/^[0-9a-f]{24}$/i) ? [{ _id: key }] : [])],
-    }).select('name username profile sellerRating sellerSalesCount sustainabilityScore itemsRescued co2SavedKg waterSavedLiters settings.privateProfile createdAt');
+    }).select('name username profile sellerRating sellerSalesCount sustainabilityScore itemsRescued co2SavedKg waterSavedLiters settings.privateProfile createdAt flagCount deactivated flaggedBy');
     if (!user) {
       res.status(404);
       throw new Error('User not found');
@@ -74,6 +74,72 @@ router.get('/:idOrUsername', async (req, res, next) => {
     }
     const listingsCount = await Product.countDocuments({ seller: user._id, status: 'active' });
     res.json({ user, listingsCount });
+  } catch (err) { next(err); }
+});
+
+// POST /api/users/:idOrUsername/flag — flag a user for selling fakes
+router.post('/:idOrUsername/flag', protect, async (req, res, next) => {
+  try {
+    const key = req.params.idOrUsername;
+    const target = await User.findOne({
+      $or: [{ username: key }, ...(key.match(/^[0-9a-f]{24}$/i) ? [{ _id: key }] : [])],
+    });
+    if (!target) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+    if (String(target._id) === String(req.user._id)) {
+      res.status(400);
+      throw new Error('You cannot flag yourself');
+    }
+    const already = target.flaggedBy.some(id => String(id) === String(req.user._id));
+    if (already) {
+      res.status(409);
+      throw new Error('You have already flagged this user');
+    }
+    target.flaggedBy.push(req.user._id);
+    target.flagCount = target.flaggedBy.length;
+    if (target.flagCount >= 3 && !target.deactivated) {
+      target.deactivated = true;
+      target.deactivatedAt = new Date();
+    }
+    await target.save();
+    res.json({
+      flagged: true,
+      flagCount: target.flagCount,
+      deactivated: target.deactivated,
+      message: target.deactivated
+        ? `Reported. This account has been deactivated after ${target.flagCount} flags.`
+        : `Reported. ${3 - target.flagCount} more flag${3 - target.flagCount === 1 ? '' : 's'} until deactivation.`,
+    });
+  } catch (err) { next(err); }
+});
+
+// POST /api/users/:idOrUsername/unflag — withdraw your flag
+router.post('/:idOrUsername/unflag', protect, async (req, res, next) => {
+  try {
+    const key = req.params.idOrUsername;
+    const target = await User.findOne({
+      $or: [{ username: key }, ...(key.match(/^[0-9a-f]{24}$/i) ? [{ _id: key }] : [])],
+    });
+    if (!target) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+    const before = target.flaggedBy.length;
+    target.flaggedBy = target.flaggedBy.filter(id => String(id) !== String(req.user._id));
+    if (target.flaggedBy.length === before) {
+      res.status(409);
+      throw new Error("You haven't flagged this user");
+    }
+    target.flagCount = target.flaggedBy.length;
+    // Reinstate if they were deactivated and now drop below threshold
+    if (target.deactivated && target.flagCount < 3) {
+      target.deactivated = false;
+      target.deactivatedAt = undefined;
+    }
+    await target.save();
+    res.json({ flagged: false, flagCount: target.flagCount, deactivated: target.deactivated });
   } catch (err) { next(err); }
 });
 
