@@ -2926,9 +2926,9 @@ export default function Revogue() {
           </label>
         ) : (
           <div style={{padding:'0 20px 14px'}}>
-            <div style={{display:'flex',gap:8,overflowX:'auto',paddingBottom:4}}>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(3, 1fr)',gap:8}}>
               {draft.imgs.map((src, i) => (
-                <div key={i} style={{flex:'0 0 auto',width:90,height:110,borderRadius:12,overflow:'hidden',position:'relative',border:'1px solid #eae0cc'}}>
+                <div key={i} style={{aspectRatio:'3/4',borderRadius:12,overflow:'hidden',position:'relative',border:'1px solid #eae0cc'}}>
                   <img src={src} alt={`photo-${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
                   <button onClick={() => removePhoto(i)} style={{position:'absolute',top:4,right:4,width:22,height:22,borderRadius:'50%',background:'rgba(26,20,16,0.8)',color:'white',border:'none',cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',padding:0}}><X size={12}/></button>
                   {i === 0 && <div style={{position:'absolute',bottom:4,left:4,padding:'2px 6px',background:'rgba(250,246,237,0.95)',borderRadius:6,fontSize:8,fontWeight:600,letterSpacing:0.5}}>COVER</div>}
@@ -2936,7 +2936,7 @@ export default function Revogue() {
               ))}
               {draft.imgs.length < 6 && (
                 <label style={{cursor:'pointer'}}>
-                  <div style={{width:90,height:110,borderRadius:12,border:'2px dashed #d6cab4',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,color:'var(--ink-soft)',background:'var(--cream)'}}>
+                  <div style={{aspectRatio:'3/4',borderRadius:12,border:'2px dashed #d6cab4',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:4,color:'var(--ink-soft)',background:'var(--cream)'}}>
                     <Plus size={20} strokeWidth={1.5}/>
                     <div style={{fontSize:9,letterSpacing:1,textTransform:'uppercase'}}>{draft.imgs.length}/6</div>
                   </div>
@@ -2944,6 +2944,7 @@ export default function Revogue() {
                 </label>
               )}
             </div>
+            <div style={{fontSize:10,color:'var(--ink-soft)',marginTop:6,textAlign:'center',fontStyle:'italic'}}>The first photo is your cover image · tap × to remove</div>
           </div>
         )}
 
