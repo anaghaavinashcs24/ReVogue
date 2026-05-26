@@ -252,6 +252,7 @@ export default function Revogue() {
   const [viewingUserLoading, setViewingUserLoading] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null); // url string when open, null when closed
   const [legalSheet, setLegalSheet] = useState(null); // 'terms' | 'privacy' | null
+  const [detailImgIdx, setDetailImgIdx] = useState(0);
   const [wishlist, setWishlist] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -470,6 +471,7 @@ export default function Revogue() {
   }, []);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
+  useEffect(() => { setDetailImgIdx(0); }, [selectedProduct?.id]);
 
   // ----- Auto-login if a token already exists -----
   useEffect(() => {
@@ -3275,9 +3277,37 @@ export default function Revogue() {
           }
           window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
         }}><Share2 size={16} strokeWidth={1.8}/></button>
-        <div className="rv-detail-img" onClick={() => setLightboxImage(p.img)} style={{cursor:'zoom-in'}}>
-          <img src={p.img} alt={p.title} onError={(e) => handleImgError(e, p)}/>
-        </div>
+        {(() => {
+          const gallery = (p.imgs && p.imgs.length > 0) ? p.imgs : [p.img].filter(Boolean);
+          return (
+            <div style={{position:'relative'}}>
+              <div
+                onScroll={(e) => {
+                  const w = e.currentTarget.clientWidth || 1;
+                  const next = Math.round(e.currentTarget.scrollLeft / w);
+                  if (next !== detailImgIdx) setDetailImgIdx(next);
+                }}
+                style={{display:'flex',overflowX:'auto',scrollSnapType:'x mandatory',aspectRatio:'1',background:'var(--cream)',scrollbarWidth:'none'}}
+              >
+                {gallery.map((src, i) => (
+                  <div key={i} onClick={() => setLightboxImage(src)} style={{flex:'0 0 100%',scrollSnapAlign:'start',cursor:'zoom-in'}}>
+                    <img src={src} alt={`${p.title} ${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}} onError={(e) => handleImgError(e, p)}/>
+                  </div>
+                ))}
+              </div>
+              {gallery.length > 1 && (
+                <>
+                  <div style={{position:'absolute',top:14,right:14,padding:'4px 10px',background:'rgba(26,20,16,0.6)',color:'white',borderRadius:12,fontSize:11,fontWeight:500,backdropFilter:'blur(8px)'}}>{detailImgIdx + 1}/{gallery.length}</div>
+                  <div style={{position:'absolute',bottom:14,left:0,right:0,display:'flex',justifyContent:'center',gap:6}}>
+                    {gallery.map((_, i) => (
+                      <div key={i} style={{width: i === detailImgIdx ? 18 : 6,height:6,borderRadius:3,background: i === detailImgIdx ? 'white' : 'rgba(255,255,255,0.55)',transition:'all 0.25s'}}/>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })()}
         <div className="rv-detail-body">
           <div className="rv-detail-meta">
             <div>
