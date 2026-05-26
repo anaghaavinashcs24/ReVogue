@@ -251,6 +251,7 @@ export default function Revogue() {
   const [viewingUser, setViewingUser] = useState(null); // { username, name, profile, listings, posts, ... }
   const [viewingUserLoading, setViewingUserLoading] = useState(false);
   const [lightboxImage, setLightboxImage] = useState(null); // url string when open, null when closed
+  const [legalSheet, setLegalSheet] = useState(null); // 'terms' | 'privacy' | null
   const [wishlist, setWishlist] = useState([]);
   const [cart, setCart] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1147,13 +1148,50 @@ export default function Revogue() {
 
                 {!isForgot && (
                   <div style={{ textAlign: 'center', marginTop: 18, fontSize: 11, color: 'var(--ink-soft)', lineHeight: 1.6 }}>
-                    {isSignUp ? <>By creating an account, you agree to our <span style={{color:'var(--ink)',textDecoration:'underline'}}>Terms</span> & <span style={{color:'var(--ink)',textDecoration:'underline'}}>Privacy</span> ♡</> : <>Don't have an account? <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{background:'none',border:'none',color:'var(--terracotta)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11}}>Create one</button></>}
+                    {isSignUp ? <>By creating an account, you agree to our <button onClick={() => setLegalSheet('terms')} style={{background:'none',border:'none',padding:0,color:'var(--ink)',textDecoration:'underline',cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:500}}>Terms</button> & <button onClick={() => setLegalSheet('privacy')} style={{background:'none',border:'none',padding:0,color:'var(--ink)',textDecoration:'underline',cursor:'pointer',fontFamily:'inherit',fontSize:11,fontWeight:500}}>Privacy</button> ♡</> : <>Don't have an account? <button onClick={() => { setAuthMode('signup'); setAuthError(''); setContactError(''); }} style={{background:'none',border:'none',color:'var(--terracotta)',fontWeight:600,cursor:'pointer',fontFamily:'inherit',fontSize:11}}>Create one</button></>}
                   </div>
                 )}
               </div>
             </div>
           </div>
         </div>
+        {legalSheet && (
+          <div onClick={() => setLegalSheet(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:1500,display:'flex',alignItems:'flex-end',justifyContent:'center'}}>
+            <div onClick={(e) => e.stopPropagation()} style={{background:'var(--paper)',width:'100%',maxWidth:480,borderRadius:'20px 20px 0 0',padding:'24px 22px 30px',maxHeight:'88vh',overflowY:'auto'}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                <div className="rv-logo rv-serif" style={{fontSize:22}}>{legalSheet === 'terms' ? <>Terms of <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>Service</em></> : <>Privacy <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>Policy</em></>}</div>
+                <button onClick={() => setLegalSheet(null)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',display:'flex',padding:4}}><X size={20}/></button>
+              </div>
+              <div style={{fontSize:11,color:'var(--ink-soft)',marginBottom:14,fontStyle:'italic'}}>Last updated · {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
+              {legalSheet === 'terms' ? (
+                <div style={{fontSize:13,color:'var(--ink)',lineHeight:1.65}}>
+                  <p><strong>1. Welcome to Revogue.</strong> By creating an account you agree to use Revogue to buy, sell, and share pre-loved fashion in good faith.</p>
+                  <p><strong>2. Your account.</strong> Keep your password safe. You're responsible for activity on your account. One person, one account — no impersonation.</p>
+                  <p><strong>3. Listings.</strong> Describe items honestly. Photos should be of the actual item you're selling. No fakes, replicas, or counterfeits. Listings flagged 3+ times for fakes will result in account deactivation.</p>
+                  <p><strong>4. Buying.</strong> Once you place an order, you agree to pay. Returns are accepted within 3 days for items not as described.</p>
+                  <p><strong>5. Community.</strong> Be kind. No harassment, hate speech, spam, or off-platform solicitation. We may remove content or accounts that break this rule.</p>
+                  <p><strong>6. Content you post.</strong> You keep ownership of photos and captions you upload. You grant Revogue a non-exclusive license to display them within the app.</p>
+                  <p><strong>7. Fees.</strong> A 2% platform fee applies to each purchase to keep the lights on.</p>
+                  <p><strong>8. Changes.</strong> We may update these terms. Continued use after an update means you accept them.</p>
+                  <p style={{color:'var(--ink-soft)',fontStyle:'italic',marginTop:18}}>Questions? Reach us at hello@revogue.app.</p>
+                </div>
+              ) : (
+                <div style={{fontSize:13,color:'var(--ink)',lineHeight:1.65}}>
+                  <p><strong>What we collect.</strong> Your name, email or phone, password (stored hashed), profile bio, address(es), payment method details you save, items you list/buy/save, and photos you upload.</p>
+                  <p><strong>How we use it.</strong> To run your account, ship your orders, show you relevant items, and protect the community from fraud.</p>
+                  <p><strong>Who sees what.</strong> Your public profile (name, bio, listings, posts) is visible to anyone. Your email, phone, addresses, and payment methods are never shown to other users.</p>
+                  <p><strong>Images.</strong> Photos you upload are stored on Cloudinary and served from their CDN.</p>
+                  <p><strong>Payments.</strong> We don't store full card numbers — only the last 4 digits and the card brand for display.</p>
+                  <p><strong>Your controls.</strong> You can edit your profile, change your password (via the security question flow), make your profile private, or delete your account at any time from Settings.</p>
+                  <p><strong>Cookies & tracking.</strong> We use a single auth token stored in your browser to keep you signed in. No third-party trackers.</p>
+                  <p><strong>Data retention.</strong> When you delete your account, your personal data is removed; aggregated, anonymized stats may be retained.</p>
+                  <p style={{color:'var(--ink-soft)',fontStyle:'italic',marginTop:18}}>Questions? Reach us at hello@revogue.app.</p>
+                </div>
+              )}
+              <button onClick={() => setLegalSheet(null)} style={{width:'100%',marginTop:20,padding:14,borderRadius:24,border:'none',background:'var(--ink)',color:'var(--paper)',fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Got it</button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -3386,6 +3424,43 @@ export default function Revogue() {
                 <X size={20}/>
               </button>
               <img src={lightboxImage} alt="" style={{maxWidth:'94%',maxHeight:'90%',objectFit:'contain',borderRadius:8,boxShadow:'0 20px 50px rgba(0,0,0,0.5)'}}/>
+            </div>
+          )}
+          {legalSheet && (
+            <div onClick={() => setLegalSheet(null)} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.45)',zIndex:1500,display:'flex',alignItems:'flex-end',justifyContent:'center',animation:'rvFadeIn 0.2s ease'}}>
+              <div onClick={(e) => e.stopPropagation()} style={{background:'var(--paper)',width:'100%',maxWidth:480,borderRadius:'20px 20px 0 0',padding:'24px 22px 30px',maxHeight:'88vh',overflowY:'auto',animation:'rvSlideUp 0.3s ease'}}>
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+                  <div className="rv-logo rv-serif" style={{fontSize:22}}>{legalSheet === 'terms' ? <>Terms of <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>Service</em></> : <>Privacy <em style={{color:'var(--terracotta)',fontStyle:'italic'}}>Policy</em></>}</div>
+                  <button onClick={() => setLegalSheet(null)} style={{background:'none',border:'none',cursor:'pointer',color:'var(--ink-soft)',display:'flex',padding:4}}><X size={20}/></button>
+                </div>
+                <div style={{fontSize:11,color:'var(--ink-soft)',marginBottom:14,fontStyle:'italic'}}>Last updated · {new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</div>
+                {legalSheet === 'terms' ? (
+                  <div style={{fontSize:13,color:'var(--ink)',lineHeight:1.65}}>
+                    <p><strong>1. Welcome to Revogue.</strong> By creating an account you agree to use Revogue to buy, sell, and share pre-loved fashion in good faith.</p>
+                    <p><strong>2. Your account.</strong> Keep your password safe. You're responsible for activity on your account. One person, one account — no impersonation.</p>
+                    <p><strong>3. Listings.</strong> Describe items honestly. Photos should be of the actual item you're selling. No fakes, replicas, or counterfeits. Listings flagged 3+ times for fakes will result in account deactivation.</p>
+                    <p><strong>4. Buying.</strong> Once you place an order, you agree to pay. Returns are accepted within 3 days for items not as described.</p>
+                    <p><strong>5. Community.</strong> Be kind. No harassment, hate speech, spam, or off-platform solicitation. We may remove content or accounts that break this rule.</p>
+                    <p><strong>6. Content you post.</strong> You keep ownership of photos and captions you upload. You grant Revogue a non-exclusive license to display them within the app.</p>
+                    <p><strong>7. Fees.</strong> A 2% platform fee applies to each purchase to keep the lights on.</p>
+                    <p><strong>8. Changes.</strong> We may update these terms. Continued use after an update means you accept them.</p>
+                    <p style={{color:'var(--ink-soft)',fontStyle:'italic',marginTop:18}}>Questions? Reach us at hello@revogue.app.</p>
+                  </div>
+                ) : (
+                  <div style={{fontSize:13,color:'var(--ink)',lineHeight:1.65}}>
+                    <p><strong>What we collect.</strong> Your name, email or phone, password (stored hashed), profile bio, address(es), payment method details you save, items you list/buy/save, and photos you upload.</p>
+                    <p><strong>How we use it.</strong> To run your account, ship your orders, show you relevant items, and protect the community from fraud.</p>
+                    <p><strong>Who sees what.</strong> Your public profile (name, bio, listings, posts) is visible to anyone. Your email, phone, addresses, and payment methods are never shown to other users.</p>
+                    <p><strong>Images.</strong> Photos you upload are stored on Cloudinary and served from their CDN.</p>
+                    <p><strong>Payments.</strong> We don't store full card numbers — only the last 4 digits and the card brand for display.</p>
+                    <p><strong>Your controls.</strong> You can edit your profile, change your password (via the security question flow), make your profile private, or delete your account at any time from Settings.</p>
+                    <p><strong>Cookies & tracking.</strong> We use a single auth token stored in your browser to keep you signed in. No third-party trackers.</p>
+                    <p><strong>Data retention.</strong> When you delete your account, your personal data is removed; aggregated, anonymized stats may be retained.</p>
+                    <p style={{color:'var(--ink-soft)',fontStyle:'italic',marginTop:18}}>Questions? Reach us at hello@revogue.app.</p>
+                  </div>
+                )}
+                <button onClick={() => setLegalSheet(null)} style={{width:'100%',marginTop:20,padding:14,borderRadius:24,border:'none',background:'var(--ink)',color:'var(--paper)',fontSize:12,letterSpacing:1,textTransform:'uppercase',cursor:'pointer',fontFamily:'inherit',fontWeight:500}}>Got it</button>
+              </div>
             </div>
           )}
           {showTabBar && (
