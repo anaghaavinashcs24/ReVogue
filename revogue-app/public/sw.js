@@ -3,8 +3,8 @@
 // offline. It deliberately stays out of the way of API calls — anything that
 // isn't a same-origin page/asset is passed straight to the network.
 
-const CACHE = 'revogue-shell-v1';
-const SHELL = ['/', '/index.html', '/manifest.json', '/icon-192.svg', '/icon-512.svg'];
+const CACHE = 'revogue-shell-v2';
+const SHELL = ['/', '/index.html', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
