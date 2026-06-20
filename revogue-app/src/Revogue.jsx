@@ -1716,8 +1716,9 @@ export default function Revogue() {
           const post = visiblePosts.find(p => p.id === openComments);
           if (!post) return null;
           const isBackendPost = typeof openComments === 'string';
-          // Normalize all comments to {user, text, time} for display
-          const serverComments = (post.comments || []).map(c => ({
+          // Normalize all comments to {user, text, time} for display.
+          // STYLE_POSTS fallback uses a numeric `comments` count, so coerce to [] before mapping.
+          const serverComments = (Array.isArray(post.comments) ? post.comments : []).map(c => ({
             user: c.username || c.user || 'user',
             text: c.text,
             time: c.createdAt ? new Date(c.createdAt).toLocaleString('en-IN', { hour: '2-digit', minute: '2-digit' }) : 'now',
@@ -2361,7 +2362,7 @@ export default function Revogue() {
                   <div style={{fontFamily:'Fraunces, serif',fontSize:13,lineHeight:1.4,marginBottom:6,overflow:'hidden',display:'-webkit-box',WebkitLineClamp:3,WebkitBoxOrient:'vertical'}}>{post.caption || <em style={{color:'var(--ink-soft)'}}>(no caption)</em>}</div>
                   <div style={{display:'flex',gap:12,fontSize:11,color:'var(--ink-soft)',marginTop:'auto'}}>
                     <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Heart size={11}/> {post.likes || 0}</span>
-                    <span style={{display:'inline-flex',alignItems:'center',gap:3}}><MessageCircle size={11}/> {(post.comments || []).length}</span>
+                    <span style={{display:'inline-flex',alignItems:'center',gap:3}}><MessageCircle size={11}/> {Array.isArray(post.comments) ? post.comments.length : (Number(post.comments) || 0)}</span>
                     {post.products?.length > 0 && <span style={{display:'inline-flex',alignItems:'center',gap:3}}><Package size={11}/> {post.products.length}</span>}
                   </div>
                 </div>
