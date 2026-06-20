@@ -984,7 +984,7 @@ export default function Revogue() {
     @keyframes rvToastIn { from { opacity: 0; transform: translateY(20px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     /* MODAL SHEET (comments) */
-    .rv-modal-backdrop { position: fixed; inset: 0; background: rgba(26, 20, 16, 0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; animation: rvFadeIn 0.25s ease; }
+    .rv-modal-backdrop { position: fixed; left: 0; right: 0; top: 0; height: 100vh; height: 100dvh; background: rgba(26, 20, 16, 0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; animation: rvFadeIn 0.25s ease; }
     .rv-modal-sheet { max-width: 400px; }
     .rv-modal-sheet { width: 100%; max-height: 75%; background: var(--paper); border-radius: 24px 24px 0 0; display: flex; flex-direction: column; animation: rvSheetUp 0.32s cubic-bezier(0.2, 0.8, 0.4, 1); overflow: hidden; }
     .rv-modal-handle { width: 38px; height: 4px; background: #d6cab4; border-radius: 2px; margin: 10px auto 8px; }
@@ -1801,7 +1801,7 @@ export default function Revogue() {
                     </div>
                   ))}
                 </div>
-                <div style={{padding:'10px 16px 14px',borderTop:'1px solid #eae0cc',display:'flex',gap:8,alignItems:'center',background:'var(--paper)'}}>
+                <div style={{padding:'10px 16px',paddingBottom:'calc(14px + env(safe-area-inset-bottom, 0px))',borderTop:'1px solid #eae0cc',display:'flex',gap:8,alignItems:'center',background:'var(--paper)'}}>
                   <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg, var(--terracotta), var(--gold))',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',color:'white',fontFamily:'Fraunces, serif',fontWeight:600,fontSize:12,overflow:'hidden'}}>{userAvatar ? <img src={userAvatar} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/> : (userName || 'Y')[0].toUpperCase()}</div>
                   <input
                     value={commentDraft}
