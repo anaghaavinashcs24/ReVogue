@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Search, Heart, ShoppingBag, Home, User, Sparkles, Plus, ArrowLeft, Star, Filter, Check, Camera, MessageCircle, Share2, Bookmark, ChevronRight, Trash2, MapPin, CreditCard, Truck, Shield, X, Eye, EyeOff, TrendingUp, Award, Zap, Package, Edit3 } from 'lucide-react';
 import { api, getToken, setToken } from './api';
 
@@ -1776,7 +1777,7 @@ export default function Revogue() {
               pushToast(e.message || 'Comment failed', 'info');
             }
           };
-          return (
+          return createPortal((
             <div className="rv-modal-backdrop" onClick={() => setOpenComments(null)}>
               <div className="rv-modal-sheet" onClick={e => e.stopPropagation()}>
                 <div className="rv-modal-handle"/>
@@ -1814,7 +1815,7 @@ export default function Revogue() {
                 </div>
               </div>
             </div>
-          );
+          ), document.body);
         })()}
       </>
     );

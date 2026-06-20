@@ -87,6 +87,12 @@ router.post('/', async (req, res, next) => {
       throw new Error('No purchasable items in this order');
     }
 
+    // A seller can't buy their own listing.
+    if (orderItems.some(i => i.seller && String(i.seller) === String(req.user._id))) {
+      res.status(400);
+      throw new Error("You can't buy your own listing");
+    }
+
     let shippingAddress;
     if (req.body.addressId) {
       const a = await Address.findOne({ _id: req.body.addressId, user: req.user._id });
