@@ -7,3 +7,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <Revogue />
   </React.StrictMode>
 );
+
+// Register the service worker so the app is installable as a PWA / APK.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
