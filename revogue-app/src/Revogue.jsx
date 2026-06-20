@@ -3450,7 +3450,9 @@ export default function Revogue() {
   else if (activeTab === 'bag') content = renderBag();
 
   const subPages = ['confirm', 'edit-profile', 'my-listings', 'my-orders', 'addresses', 'payment-methods', 'sustainability', 'settings', 'public-profile', 'saved-looks', 'my-looks'];
-  const showTabBar = !subPages.includes(screen);
+  // Hide the bottom tab bar while the comments sheet is open — the sheet covers the
+  // whole screen, and the tab bar otherwise sits on top of it and hides the input.
+  const showTabBar = !subPages.includes(screen) && openComments === null;
 
   return (
     <div className="revogue-root" style={themeVars}>
