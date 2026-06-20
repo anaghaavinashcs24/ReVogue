@@ -606,6 +606,13 @@ export default function Revogue() {
   };
 
   const addToCart = async (product) => {
+    // Sellers can't buy their own listings.
+    const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+    if (getToken() && product.seller &&
+        (product.seller === myUsername || product.seller === myHandle || product.seller === (userName || '').toLowerCase())) {
+      pushToast("You can't buy your own listing", 'info');
+      return;
+    }
     if (cart.find(p => p.id === product.id)) {
       pushToast('Already in your bag', 'info');
       return;
@@ -977,7 +984,8 @@ export default function Revogue() {
     @keyframes rvToastIn { from { opacity: 0; transform: translateY(20px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
 
     /* MODAL SHEET (comments) */
-    .rv-modal-backdrop { position: absolute; inset: 0; background: rgba(26, 20, 16, 0.5); z-index: 150; display: flex; align-items: flex-end; animation: rvFadeIn 0.25s ease; }
+    .rv-modal-backdrop { position: fixed; inset: 0; background: rgba(26, 20, 16, 0.5); z-index: 1000; display: flex; align-items: flex-end; justify-content: center; animation: rvFadeIn 0.25s ease; }
+    .rv-modal-sheet { max-width: 400px; }
     .rv-modal-sheet { width: 100%; max-height: 75%; background: var(--paper); border-radius: 24px 24px 0 0; display: flex; flex-direction: column; animation: rvSheetUp 0.32s cubic-bezier(0.2, 0.8, 0.4, 1); overflow: hidden; }
     .rv-modal-handle { width: 38px; height: 4px; background: #d6cab4; border-radius: 2px; margin: 10px auto 8px; }
     @keyframes rvFadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -3267,6 +3275,12 @@ export default function Revogue() {
     const p = selectedProduct;
     const inCart = cart.find(c => c.id === p.id);
     const discount = Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100);
+    // A seller can't buy their own listing. Match the seller handle against every
+    // form of the current user's name we store (backend username, derived handle, raw name).
+    const myHandle = (userName || '').toLowerCase().replace(/\s/g, '_');
+    const lowerName = (userName || '').toLowerCase();
+    const isMyProduct = !!getToken() && !!p.seller &&
+      (p.seller === myUsername || p.seller === myHandle || p.seller === lowerName);
     return (
       <>
         <button className="rv-detail-back" onClick={() => setScreen('app')}><ArrowLeft size={18} strokeWidth={2}/></button>
@@ -3392,12 +3406,20 @@ export default function Revogue() {
         </div>
 
         <div className="rv-detail-actions">
-          <button className={`rv-btn-wish ${wishlist.includes(p.id) ? 'active' : ''}`} onClick={() => toggleWishlist(p.id)}>
-            <Heart size={18} fill={wishlist.includes(p.id) ? 'white' : 'none'} strokeWidth={2}/>
-          </button>
-          <button className={`rv-btn-bag ${inCart ? 'in-cart' : ''}`} onClick={() => { if (!inCart) addToCart(p); setScreen('app'); setActiveTab('bag'); }}>
-            {inCart ? '✓ In your bag · View' : `Add to bag · ₹${p.price}`}
-          </button>
+          {isMyProduct ? (
+            <button className="rv-btn-bag" disabled style={{flex:1,opacity:0.6,cursor:'not-allowed',background:'var(--ink-soft)'}}>
+              This is your listing
+            </button>
+          ) : (
+            <>
+              <button className={`rv-btn-wish ${wishlist.includes(p.id) ? 'active' : ''}`} onClick={() => toggleWishlist(p.id)}>
+                <Heart size={18} fill={wishlist.includes(p.id) ? 'white' : 'none'} strokeWidth={2}/>
+              </button>
+              <button className={`rv-btn-bag ${inCart ? 'in-cart' : ''}`} onClick={() => { if (!inCart) addToCart(p); setScreen('app'); setActiveTab('bag'); }}>
+                {inCart ? '✓ In your bag · View' : `Add to bag · ₹${p.price}`}
+              </button>
+            </>
+          )}
         </div>
       </>
     );
