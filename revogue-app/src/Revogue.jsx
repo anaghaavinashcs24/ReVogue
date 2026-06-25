@@ -1861,6 +1861,7 @@ export default function Revogue() {
   const renderBag = () => (
     <>
       <div className="rv-header">
+        <button className="rv-icon-btn" onClick={() => { setActiveTab('home'); setScreen('app'); }} aria-label="Back to shopping"><ArrowLeft size={16} strokeWidth={1.8}/></button>
         <div className="rv-logo rv-serif">Your <span style={{fontStyle:'italic'}}>Bag</span></div>
         <div style={{fontSize:12,color:'var(--ink-soft)'}}>{cart.length} items</div>
       </div>
